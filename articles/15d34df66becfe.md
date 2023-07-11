@@ -85,34 +85,35 @@ row_count = db.execute_partition_update \
 
 簡単に言うと対象のテーブルを細かい範囲で分割し、その領域ごとに DML を実行するという仕組みです。そのため、処理はアトミックではないことにご留意ください。そのため、厳密にはトランザクションではありません。
 ## ステイル読み取りはどうして効率的に実行できるのか
-Cloud Spanner はデータをスプリットという単位で管理します。各スプリットは3つのゾーンに複製されます。3つの複製のうち、いずれかの一つがリーダー(Leader)として選ばれます。残りの2つはレプリカとなります。
+Cloud Spanner はデータをスプリットという単位で管理します。各スプリットは3つのゾーンに複製されます。3つの複製のうち、いずれかの一つがリーダー(Leader)として選ばれます。残りの2つはレプリカ(Replica)となります。
 
 強い整合性読み取りを行った場合、読み取りのリクエストは通常は同じゾーンにある最寄りのレプリカが処理を担当します。レプリカは読み取り対象の行が最新であるかをリーダーに確認を行います。レプリカが最新の内容を持っていることが確認できればレプリカ自身の持っている情報で処理が行われ、クライアントへ結果が返されます。レプリカの持っている内容が最新ではない場合、最新への更新を待って結果が返されます。
 
 一方で、ステイル読み取りの場合は最新から一定の時間過去のデータであることを許容します。そのため、レプリカ上のデータで処理が完結することが可能となる場合があります。これにより**ステイル読み取りは強い整合性読み取りと比べてより短い時間で応答される**ことが期待されます。
 
-では、タイムスタンプバウンドとしてどれぐらいを指定すると読み取りレイテンシの短縮に効果があるでしょうか。リーダーは10秒間隔で最新のタイムスタンプで更新するため、これよりも長い時間を指定することは安定した効果が期待できます。余裕をもって15秒のタイムスタンプバウンドを指定すると効果が大きいでしょう。
+では、タイムスタンプバウンドとしてどれぐらいを指定すると読み取りレイテンシの短縮に効果があるでしょうか。リーダーは[10秒間隔で最新のタイムスタンプで更新するため](https://cloud.google.com/spanner/docs/whitepapers/life-of-reads-and-writes?hl=ja#strong_read_multi-split)、これよりも長い時間を指定することは安定した効果が期待できます。
 
 読み取りレイテンシの短縮効果は単一リージョン構成でも実感できますが、マルチリージョン構成ではその効果はより大きくなります。これはリーダーとレプリカが地理的に離れた場所に在ることが多く、WAN 越しでのリーダーへの通信を必要とせずレプリカのみで処理が完結することの恩恵が大きいためです。Cloud Spanner を**マルチリージョン構成を利用される場合は特にステイル読み取りを活用**されることをお勧め致します。
 
 参考資料
-- https://cloud.google.com/blog/topics/developers-practitioners/what-cloud-spanner?hl=en
-- https://cloud.google.com/spanner/docs/whitepapers/life-of-reads-and-writes?hl=ja
-- https://cloud.google.com/blog/topics/developers-practitioners/demystifying-cloud-spanner-multi-region-configurations?hl=en
+- [What is Cloud Spanner?](https://cloud.google.com/blog/topics/developers-practitioners/what-cloud-spanner?hl=en)
+- [Spanner の読み取りと書き込みのライフサイクル](https://cloud.google.com/spanner/docs/whitepapers/life-of-reads-and-writes?hl=ja)
+- [Demystifying Cloud Spanner multi-region configurations](https://cloud.google.com/blog/topics/developers-practitioners/demystifying-cloud-spanner-multi-region-configurations?hl=en)
 
 
 ## どのトランザクションを使えば良いかのフローチャート
 ```mermaid
 graph LR
-	A["読み取り処理のみですか？"] -->|Yes| B["複数の読み取りで一貫した内容が必要ですか？"]
-	A -->|No|RW["更新内容が大規模ですか？"]
+	A["読み取り処理のみか？"] -->|Yes| B["複数の読み取りで一貫した内容が必要か？"]
+	A -->|No|RW["更新内容が大規模か？"]
 	
- B -->|Yes|J["読み取り内容が最新の情報であることを必要としますか？"]
+ B -->|Yes|J["読み取り内容が
+ 最新の情報であることが必要か？"]
  J -->|Yes|D["強い整合性読み取りトランザクション"]
  J -->|No|E["ステイル読み取りトランザクション"]
  
- B --> |No|I["単一読み取りメソッドが利用可能です。
- 読み取り内容は最新である必要があります？"]
+ B --> |No|I["単一読み取りメソッドが利用可能。
+ 読み取り内容は最新である必要か？"]
  I --> |Yes|SingleStrong["強い整合性読み取り"]
  I --> |No|SingleStale["ステイル読み取り"]
  
