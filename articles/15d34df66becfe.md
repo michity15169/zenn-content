@@ -85,7 +85,7 @@ row_count = db.execute_partition_update \
 
 簡単に言うと対象のテーブルを細かい範囲で分割し、その領域ごとに DML を実行するという仕組みです。この仕組み上、処理はアトミックではないことにご留意ください。そのため、厳密にはトランザクションではありません。
 
-パーティション化 DML と似た読み取りの仕組みとして [PartitionQuery](https://cloud.google.com/spanner/docs/reads?hl=ja#read_data_in_parallel] という方法もあります。パーティション化 DML と同じくクエリを小さい単位に区切って並列で実行することでスループットを高めることが期待できます。
+パーティション化 DML と似た読み取りの仕組みとして [PartitionQuery](https://cloud.google.com/spanner/docs/reads?hl=ja#read_data_in_parallel) という方法もあります。パーティション化 DML と同じくクエリを小さい単位に区切って並列で実行することでスループットを高めることが期待できます。
 
 ## ステイル読み取りはどうして効率的に実行できるのか
 Cloud Spanner はデータをスプリットという単位で管理します。各スプリットは3つのゾーンに複製されます。3つの複製のうち、いずれかの一つがリーダー(Leader)として選ばれます。残りの2つはレプリカ(Replica)となります。
