@@ -2,7 +2,8 @@
 title: "Cloud Spanner における各種トランザクションの使い分け"
 emoji: "🔧"
 type: "tech" # tech: 技術記事 / idea: アイデア
-topics: ["cloudspanner","gcp","spanner"]
+topics: ["cloudspanner", "gcp"]
+publication_name: "google_cloud_jp"
 published: true
 ---
 # Cloud Spanner における各種トランザクションの使い分け

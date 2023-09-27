@@ -2,7 +2,8 @@
 title: "Cloud Spanner の運用について"
 emoji: "🔧"
 type: "tech" # tech: 技術記事 / idea: アイデア
-topics: ["cloudspanner","spanner","gcp"]
+topics: ["cloudspanner", "gcp"]
+publication_name: "google_cloud_jp"
 published: false
 ---
 # はじめに
