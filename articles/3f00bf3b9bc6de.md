@@ -31,9 +31,9 @@ Spannerのストレージとして [Colossus](https://cloud.google.com/blog/ja/p
 
 ### インポート・エクスポート
 
-Spannerは[Dataflow](https://cloud.google.com/dataflow?hl=ja)を使ってテーブルの内容を[インポート・エクスポートする機能](https://cloud.google.com/spanner/docs/import-export-overview?hl=ja)があります。RDBでの論理バックアップに近い概念ですが、エクスポートされる形式はCSVかAvroとなり、エクスポート先はGoogle Cloud Storage(以下、GCS)のバケットになります。二次利用のためにCSV形式である必要である場合は、[Avro形式を使う方がオススメ](https://cloud.google.com/spanner/docs/import-export-overview#file-format)です。
+Spannerは[Dataflow](https://cloud.google.com/dataflow?hl=ja)を使ってテーブルの内容を[インポート・エクスポートする機能](https://cloud.google.com/spanner/docs/import-export-overview?hl=ja)があります。RDBでの論理バックアップに近い概念ですが、エクスポートされる形式はCSVかAvroとなり、エクスポート先はGoogle Cloud Storage(以下、GCS)のバケットになります。エクスポートしたデータので二次利用のためにCSV形式が必要であるとき以外は、[Avro形式を使う方がオススメ](https://cloud.google.com/spanner/docs/import-export-overview#file-format)です。
 
-Dataflowは汎用的なETLなどを行うことができるサービスですが、インポート・エクスポートの基本的な機能を使う範囲では新たにDataflowのテンプレートを独自作成する必要はありません。
+Dataflowは汎用的なETLなどを行うことができるサービスですが、Spannerのインポート・エクスポートという基本的な機能を使う範囲では新たにDataflowのテンプレートを独自作成する必要はありません。
 
 [バックアップとインポート・エクスポートのどちらを使うべきか](https://cloud.google.com/spanner/docs/import-export-overview#compare-import-export-backup-restore)については、マニュアルに比較表がありますので参照ください。
 
@@ -48,11 +48,11 @@ Spannerでは、過去のある時点のデータをクエリできる機能（�
 
 ### 断片化(fragment)対策
 
-多くのRDBではテーブルやインデックの作成後にレコードに対して追記・削除・更新を繰り返すとデータの物理レイアウトが断片化を起こしパフォーマンス低下を招きます。この対策として、定期的なインデックスを再構築してメンテナンスを行う必要があります。
+多くのRDBではテーブルやインデックスの作成後にレコードに対して追記・削除・更新を繰り返すとデータの物理レイアウトが断片化を起こしパフォーマンス低下を招くことがあります。この対策として、定期的なインデックスを再構築してメンテナンスを行う場合があります。
 
-Spannerではこのような明示的な操作は不要です。Spannerでは、[LSM tree](https://en.wikipedia.org/wiki/Log-structured_merge-tree)と呼ばれるデータ構造を使用しています。このデータ構造では、追記はもちろん、削除・更新も追記として処理されます。そのため、データファイルに隙間ができる断片化が発生しません。
+Spannerではこのような明示的な操作は不要です。Spannerでは、[LSM tree](https://en.wikipedia.org/wiki/Log-structured_merge-tree)と呼ばれるデータ構造を使用しています。このデータ構造では、追記はもちろん、削除・更新も追記として処理されます。そのため、更新にともなうデータファイルに断片化が発生しません。
 
-断片化に近い事象としては、大量のデータを一気にロードしたり削除したときが考えられます。さきほどの説明の通りこれらの操作は追記によって実現されます。もちろん削除操作を追記しただけではデータの占有サイズが大きくなる一方であるため、バックグラウンドタスクとしてコンパクションが実施されます。これによりデータが再編成されます。コンパクションの操作はシステムタスクとして実装されており、[中間の優先度で実行されています](https://cloud.google.com/spanner/docs/cpu-utilization?hl=ja#task-priority)。そのため、大量のデータ操作をしてからある程度の時間をおいてシステムタスクがCPU時間を使用する様子が観測されることがあります。ある意味定常的に詰め直しが発生しているとも言えます。この仕組みによってデータベース管理の一環として管理者による定期的なインデックスの再編成は必要ありません。
+Spannerで断片化に近い事象としては、大量のデータを一気にロードしたり削除したときが考えられます。さきほどの説明の通りこれらの操作は追記によって実現されます。もちろん削除操作を追記しただけではデータの占有サイズが大きくなる一方であるため、バックグラウンドタスクとしてコンパクションが実施されます。これによりデータが再編成されます。コンパクションの操作はシステムタスクとして実装されており、[中間の優先度で実行されています](https://cloud.google.com/spanner/docs/cpu-utilization?hl=ja#task-priority)。そのため、大量のデータ操作をしてからある程度の時間をおいてシステムタスクがCPU時間を使用する様子が観測されることがあります。ある意味定常的に詰め直しが発生しているとも言えます。この仕組みによってデータベース管理の一環として管理者による定期的なインデックスの再編成は必要ありません。
 
 ## クエリーオプティマイザー
 
