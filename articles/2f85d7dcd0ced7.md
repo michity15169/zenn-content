@@ -12,8 +12,33 @@ Spannerはスケーラビリティに優れたデータベースであると説�
 
 では実際にSpannerを普通のリレーショナルデータベース（以下、RDB）として使うと、MySQLやPostgreSQLとどこがどのように違うのか、どこを意識すればアプリケーションの移行が可能であるかという解説をしたいというのがこの記事の目的となります。
 
+## Spanner はどれぐらい普通のRDBか
+
+[Spanner](https://en.wikipedia.org/wiki/Spanner_(database))はGoogleが開発した分散データベースです。[2012年に論文](https://research.google/pubs/spanner-googles-globally-distributed-database-2/)として発表されて、当初はGoogle社内のサービスで使われておりましたが、その後クラウドサービスとしても一般に利用可能となりました。当初は専用のAPIでのアクセスのみが提供されていましたが、[2017年の論文](https://research.google/pubs/spanner-becoming-a-sql-system/)でSQLを実装したことが報告されました。
+
+Spanner以前にもGoogleにはBigtableというワイドカラム型のデータベースは存在しましたが、Spannerでは開発者にとってより使いやすいデータベースを目指してリレーショナルモデルを採用しています。そのため、RDBで慣れ親しんだテーブル定義があり、カラムには型が存在し、トランザクションによりアトミックな操作が可能です。
+
+クエリーは`SELECT`で行うことができ、更新は`INSERT`,`DELETE`,`UPDATE`文が使えます。経緯のところでもご紹介した通り、Spannerの開発当初はSQLでのアクセスが提供されていない時期がありました。現在でも[その方式（ミューテーション）での更新](https://cloud.google.com/spanner/docs/modify-mutation-api?hl=ja)も利用可能です。バルクロードしたいときなどSQLを書くほどではない場面では、今でもミューテーションの方が便利なときもあります。
+
+Spannerがサポートしている現代的なRDBに求められる機能を列挙してみました。
+
+- SQLによるCRUD
+- [サブクエリー](https://cloud.google.com/spanner/docs/reference/standard-sql/subqueries)
+- 複数のテーブルへの更新がアトミックに行えるトランザクション
+- [データ型](https://cloud.google.com/spanner/docs/reference/standard-sql/data-types)
+- [セカンダリインデックス](https://cloud.google.com/spanner/docs/secondary-indexes?hl=ja)
+- [外部キー](https://cloud.google.com/spanner/docs/foreign-keys/overview?hl=ja)
+- [CHECK制約](https://cloud.google.com/spanner/docs/check-constraint/how-to?hl=ja)
+- [生成列](https://cloud.google.com/spanner/docs/generated-column/how-to?hl=ja)
+- [シーケンス](https://cloud.google.com/spanner/docs/sequence-tasks?hl=ja)
+- [JSON型](https://cloud.google.com/spanner/docs/working-with-json?hl=ja)
+- [全文検索](https://cloud.google.com/spanner/docs/full-text-search?hl=ja)
+
+一覧をみて、
+
 ## 接続ライブラリ
 
+接続されないことには話が始まらないので、まずは接続ライブラリから始めます。
 Spannerはクライアントアプリケーションとの接続にgRPCを使います。これは既存のRDBとは異なるため、クライアントライブラリは専用のものが開発されています。対応プラットフォームは以下の通りです。
 
 - C++
@@ -32,9 +57,7 @@ Spannerはクライアントアプリケーションとの接続にgRPCを使い
 クライアントライブラリとは別に[ドライバー](https://cloud.google.com/spanner/docs/drivers-overview)というものも提供されています。
 クライアントライブラリがSpannerに接続するための専用のライブラリであるのに対して、ドライバーはクライアントライブラリを各言語向けのデータベースを扱うための汎用的な仕組みに沿うようにクライアントライブラリをラップしたものです。具体的にはたとえばJavaでのJDBCやGoの[database/sql](https://pkg.go.dev/database/sql)がそれにあたります。この仕組みに乗って操作していれば、データベースがMySQLやPostgreSQLでも多くの操作を共通した記述で行うことができるものです。
 
-Goの`database/sql`を使っているアプリケーションをいくつか移植した感触としては、接続部分文字列など明らかに違う部分はあるもののそれ以外の部分は概ね手を付けなくても動作したという実感です。SQLレベルの互換性については、多くの場合はそのままで動作しましたが関数名など表記違いの箇所は書き換えが必要でした。
-
-ORMなどもドライバーの一環として提供されています。たとえばJavaの[Hibernate](https://cloud.google.com/spanner/docs/use-hibernate)やRubyの[Active Record](https://cloud.google.com/spanner/docs/use-active-record)、Pythonの[SQLAlchemy](https://cloud.google.com/spanner/docs/use-sqlalchemy)などです。これらを使えば既存のアプリケーションの移植や他のデータベースへの操作と同じお作法でSpanner対応が可能です。
+ORマッパーもドライバーの一環として提供されています。たとえばJavaの[Hibernate](https://cloud.google.com/spanner/docs/use-hibernate)やRubyの[Active Record](https://cloud.google.com/spanner/docs/use-active-record)、Pythonの[SQLAlchemy](https://cloud.google.com/spanner/docs/use-sqlalchemy)などです。これらを使えば既存のアプリケーションの移植に際して、SQLの書き換えも必要がありません。
 
 ドライバーは既存アプリケーションを移植するときには便利ですが、Spannerの独自機能などには対応していない場合もあります。各ドライバーとSpannerの機能の対応状況は[対応表](https://cloud.google.com/spanner/docs/drivers-overview#googlesql_drivers_and_orms)があります。
 
@@ -42,7 +65,7 @@ ORMなどもドライバーの一環として提供されています。たと�
 
 ### PostgreSQL互換ドライバー
 
-Spannerはアプリケーションとの間の通信をgRPCを使った独自プロトコルを使っていますが、これをPostgreSQLのワイヤプロトコルに変換する[PGAdapeter](https://cloud.google.com/spanner/docs/pgadapter)も提供されています。これを使えば、アプリケーションもPostgreSQLへの接続ドライバーをそのまま利用できますので、移植の手間がひとつ省略できます。
+Spannerはアプリケーションとの間の通信をgRPCを使った独自プロトコルを使っていますが、これをPostgreSQLのワイヤープロトコルに変換する[PGAdapeter](https://cloud.google.com/spanner/docs/pgadapter)も提供されています。これを使えば、アプリケーションもPostgreSQLへの接続ドライバーをそのまま利用できますので、移植の手間がひとつ省略できます。
 
 PGAdapterは独立したソフトウェアとして動作しますので、スタンドアロンとしても実行できますし、アプリケーションがコンテナで実行されている場合はPGAdapterをサイドカーとして実行されると良いでしょう。
 
@@ -59,13 +82,17 @@ Spannerに限定される話ではありませんが、IAM認証ではサービ�
 
 ここが一番の違いかもしれません。Spannerには`AUTO INCREMENT`はありません。代替として[BIT_REVERSE関数](https://cloud.google.com/spanner/docs/reference/standard-sql/bit_functions#bit_reverse)というものがあります。
 
-じゃあ、`AUTO INCREMENT`を使っているところはこれに書き換えればいいかと言うと、ちょっと待ってください。`AUTO INCREMENT`をプライマリキーとして使う場面の多くで必要なのは自動的に採番される単調増加し重複のない数字ではないでしょうか。このとき単調増加する、つまり追記順が保証されている必要がないのであれば、UUIDなど衝突のおそれが低い文字列を使うという方法もあります。[UUIDをデータベース側で自動生成する](https://zenn.dev/google_cloud_jp/articles/8bc8338a07f7b5#uuid-%E3%81%AE%E8%87%AA%E5%8B%95%E7%94%9F%E6%88%90)ことにより、重複がないという目的は達成することが可能です。
+じゃあ、`AUTO INCREMENT`を使っているところは機械的にこれに書き換えればいいかと言うと、ちょっと待ってください。`AUTO INCREMENT`をプライマリキーとして使う場面の多くで必要なのは自動的に採番される単調増加し重複のない数字ではないでしょうか。このとき単調増加する、つまり追記順が保証されている性質が必要がないのであれば、UUIDなど衝突のおそれが低い文字列を使うという方法もあります。[UUIDをデータベース側で自動生成する](https://zenn.dev/google_cloud_jp/articles/8bc8338a07f7b5#uuid-%E3%81%AE%E8%87%AA%E5%8B%95%E7%94%9F%E6%88%90)ことにより、重複がないという目的は達成することが可能です。
 
 追記順が維持されている必要がある場合には、BIT_REVERSE関数が有効です。
 
-プライマリキーとして単調増加する数値を使うべきではない理由は負荷の集中する箇所（ホットスポット）が発生し、それがインスタンス全体の性能のボトルネックになるためです。回避策としては単調増加して欲しい範囲が限定できるか検討する。たとえば、マルチテナントで各テナントの範囲内でのみ昇順・降順の並び替えが欲しいのであればインターリーブインデックスを作るという方法が考えられます。また、更新頻度が高くないのであれば極端に昇順・降順を忌避する必要はないかもしれません。たとえば、更新頻度が高くないマスタテーブルでは昇順のキーをつかっていたとしても性能のボトルネックとはならない事が多いためです。
+プライマリキーとして単調増加する数値を使うべきでない理由は負荷の集中する箇所（ホットスポット）が発生し、それがインスタンス全体の性能のボトルネックになるためです。回避策としては単調増加して欲しい範囲が限定できるか検討する。たとえば、マルチテナントで各テナントの範囲内でのみ昇順・降順の並び替えが欲しいのであればインターリーブインデックスを作るという方法が考えられます。また、更新頻度が高くないのであれば極端に昇順・降順を忌避する必要はないかもしれません。たとえば、更新頻度が高くないマスタテーブルでは昇順のキーをつかっていたとしても性能のボトルネックとはならない事が多いためです。
 
-## INSERT 〜 ON DUPLICATE KEY UPDATE
+## SQL
+
+Goの`database/sql`を使っているアプリケーションをいくつか移植した感触としては、接続部分文字列など明らかに違う部分はあるもののそれ以外の部分は概ね手を付けなくても動作したという実感です。SQLレベルの互換性については、多くの場合はそのままで動作しましたが関数名など表記違いの箇所は書き換えが必要でした。
+
+### INSERT 〜 ON DUPLICATE KEY UPDATE
 
 MySQLではINSERT時にすでに同じプライマリキーのレコードが存在した場合には更新を、なかったときには追記をするという[構文があります](https://dev.mysql.com/doc/refman/8.0/ja/insert-on-duplicate.html)。PostgreSQLではINSERTの[ON CONFLICT句](https://www.postgresql.jp/document/15/html/sql-insert.html#SQL-ON-CONFLICT)がそれにあたります。
 
@@ -73,15 +100,19 @@ MySQLではINSERT時にすでに同じプライマリキーのレコードが存
 
 ## スケーラビリティ以外でのSpannerのメリット
 
-### 可用性
+### 可用性が高い
 
 Spannerはリージョナル構成で99.99%、マルチリージョンとデュアルリージョン構成で99.999%の可用性のSLAが提供されています。後述の通りメンテナンスウィンドウもないため、この可用性にはメンテナンスウィンドウを除くといった注釈もありません。
 
-### メンテナンスの手間
+### メンテナンスの手間がない
 
 Spannerには内部にコンピュートノードという概念がありますが、ノードへのメンテナンスダウンタイムはありません。コンピュートとストレージが分離されており、コンピュートは何らかの物理的実体の上で動作してしていますがそれぞれのコンポーネントは冗長構成となっているためコンピュートのメンテナンスが必要な場合もサービスに影響を与えることなく自動的に実行できるためです。
 
 これはソフトウェアの更新に関しても同様です。ソフトウェアの更新は順次適用され、更新中にダウンタイムなども生じません。そのため、メンテナンスウィンドウの概念も存在しませんし、パッチ適用のためのサービス中断の調整なども必要ありません。
+
+### Graphデータベースとしての機能
+
+### 全文検索としての機能
 
 ### Google Cloudの他サービスとの連携
 
