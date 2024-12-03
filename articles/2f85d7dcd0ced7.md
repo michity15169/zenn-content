@@ -137,4 +137,4 @@ Spannerには内部にコンピュートノードという概念があります�
 SpannerはBigQueryを始め、Google Cloudのサービスと連携できます。
 SpannerのデータをBigQueryで分析したいときには、[DataBoost](https://cloud.google.com/spanner/docs/databoost/databoost-overview?hl=ja)という仕組みを使うことでSpannerのインスタンスに負荷をかけることなくデータが連携できます。逆にBigQueryで分析した結果を書き戻したい場合には、[リバースETL](https://cloud.google.com/bigquery/docs/export-to-spanner?hl=ja)を使えばBigQuery上ではクエリーを書くだけで連携できます。
 
-その他、汎用的なCDCの仕組みであるDatastream
+その他、汎用的なCDCの仕組みである[Datastreamでデータを書き込む](https://cloud.google.com/dataflow/docs/guides/templates/provided/datastream-to-cloud-spanner?hl=ja)、[Vertex AIを使ってMLのモデルで推論](https://cloud.google.com/dataproc-serverless/docs/templates/storage-to-spanner?hl=ja)を行うなども可能です。
