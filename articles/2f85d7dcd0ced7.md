@@ -65,7 +65,7 @@ ORマッパーもドライバーの一環として提供されています。た
 
 ### PostgreSQL互換ドライバー
 
-Spannerはアプリケーションとの間の通信をgRPCを使った独自プロトコルを使っていますが、これをPostgreSQLのワイヤープロトコルに変換する[PGAdapeter](https://cloud.google.com/spanner/docs/pgadapter)も提供されています。これを使えば、アプリケーションもPostgreSQLへの接続ドライバーをそのまま利用できますので、移植の手間がひとつ省略できます。
+Spannerはアプリケーションとの間の通信をgRPCを使った独自プロトコルを使っていますが、これをPostgreSQLのワイヤープロトコルに変換する[PGAdapter](https://cloud.google.com/spanner/docs/pgadapter)も提供されています。これを使えば、アプリケーションもPostgreSQLへの接続ドライバーをそのまま利用できますので、移植の手間がひとつ省略できます。
 
 PGAdapterはライブラリや独立したソフトウェアのいずれの方法でも利用できます。スタンドアロンでも実行できますし、アプリケーションがコンテナで実行されている場合はPGAdapterをサイドカーとして実行されると良いでしょう。
 
