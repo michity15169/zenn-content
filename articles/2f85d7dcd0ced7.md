@@ -8,15 +8,15 @@ published: true
 ---
 ## この記事の目的
 
-Spannerはスケーラビリティに優れたデータベースであると説明されることの多いデータベースです。スケーラビリティの面が強調された結果、「Spannerは何か特殊なデータベースではないか」「名前は聞いたことあるけど、普通のアプリケーションでは使えないんでしょ」というイメージを持たれていると感じています。スケーラビリティに特長があるの事実ですが、データベースとしてみるとテーブル定義とデータ型があり、トランザクションが実行可能で、SQLでクエリーや更新ないわば「普通のリレーショナルデータベース」としての側面もあります。
+Spannerはスケーラビリティに優れたデータベースであると説明されることの多いデータベースです。スケーラビリティの面が強調された結果、「Spannerは何か特殊なデータベースではないか」「名前は聞いたことあるけど、普通のアプリケーションでは使えないんでしょ」というイメージを持たれていると感じています。スケーラビリティに特長があるのは事実ですが、データベースとしてみるとテーブル定義とデータ型があり、トランザクションが実行可能で、SQLでクエリーや更新ないわば「普通のリレーショナルデータベース」としての側面もあります。
 
-では実際にSpannerを普通のリレーショナルデータベース（以下、RDB）として使うと、MySQLやPostgreSQLとどこがどのように違うのか、どこを意識すればアプリケーションの移植が可能であるかという解説をしたいというのがこの記事の目的となります。
+では実際にSpannerを普通のリレーショナルデータベース（以下、RDB）として使うと、MySQLやPostgreSQLとどこがどのように違うのか、どこを意識すればアプリケーションの移植が可能であるかという解説をしたいというのがこの記事の目的となります。後半では普通のRDBと比較してSpannerのスケーラビリティ以外のメリットについて解説しました。
 
 ## Spanner はどれぐらい普通のRDBか
 
-[Spanner](https://en.wikipedia.org/wiki/Spanner_(database))はGoogleが開発した分散データベースです。[2012年に論文](https://research.google/pubs/spanner-googles-globally-distributed-database-2/)として発表されて、当初はGoogle社内のサービスで使われておりましたが、その後に2017年にはクラウドサービスとしても一般に利用可能となりました。当初は専用のAPIでのアクセスのみが提供されていましたが、[2017年の論文](https://research.google/pubs/spanner-becoming-a-sql-system/)でSQLによるアクセス方法も実装したことが報告されました。
+[Spanner](https://en.wikipedia.org/wiki/Spanner_(database))はGoogleが開発した分散データベースです。[2012年に論文](https://research.google/pubs/spanner-googles-globally-distributed-database-2/)として発表されて、当初はGoogle社内のサービスで使われておりましたが、その後に2017年にはクラウドサービスとしても一般に利用可能となりました。当初は専用のAPIでのアクセスのみが提供されていましたが、[2017年の論文](https://research.google/pubs/spanner-becoming-a-sql-system/)でSQLによるアクセス方法も実装したことが発表されました。
 
-Spanner以前にもGoogleにはBigtableというKVSに似たワイドカラム型のデータベースは存在しました。KVSはスケーラビリティやレイテンシーに優れていますが、アプリケーションを開発するという観点ではそのままでは使いにくい場面もあります。複雑なアプリケーションを実装するにはRDBと併用するか、トランザクションを独自に実装されているのではないでしょうか。Spannerでは開発者にとってより使いやすいデータベースを目指してリレーショナルモデルを採用しました。そのため、RDBで慣れ親しんだテーブル定義があり、カラムにはデータ型が存在し、トランザクションによりアトミックな操作が可能です。
+Spanner以前にもGoogle社内にはBigtableというキーバリューストア（KVS）の一種であるワイドカラム型のデータベースは存在しました。KVSはスケーラビリティやレイテンシーに優れていますが、アプリケーションを開発するという観点ではそのままでは使いにくい場面もあります。複雑なアプリケーションを実装するにはRDBと併用するか、トランザクションの仕組みを独自に実装する必要が出てきます。Spannerでは開発者にとってより使いやすいデータベースを目指してリレーショナルモデルを採用しました。そのため、RDBで慣れ親しんだテーブル定義があり、カラムにはデータ型が存在し、トランザクションによりアトミックな操作が可能です。
 
 クエリーは`SELECT`で行うことができ、更新は`INSERT`,`DELETE`,`UPDATE`文が使えます。経緯のところでもご紹介した通り、Spannerの開発当初はAPIによる更新のみが提供されている時期がありました。現在でも[API（ミューテーション）での更新](https://cloud.google.com/spanner/docs/modify-mutation-api?hl=ja)も利用可能です。バルクロードしたいときなどSQLを書くほどではない場面では、今でもミューテーションの方が便利なときもあります。
 
@@ -55,7 +55,7 @@ Spannerはクライアントアプリケーションとの接続にgRPCを使い
 新規のアプリケーションでSpannerのフル機能を活用されたい場合はこちらの使用もオススメですが、一般的なRDBのドライバーに慣れておられる場合や既存のアプリケーションの移植では後述のドライバーを使う方が良い場合もあります。
 
 クライアントライブラリとは別に[ドライバー](https://cloud.google.com/spanner/docs/drivers-overview)というものも提供されています。
-クライアントライブラリがSpannerに接続するための専用のライブラリであるのに対して、ドライバーはクライアントライブラリを各言語向けのデータベースを扱うための汎用的な仕組みに沿うようにクライアントライブラリをラップしたものです。具体的にはたとえばJavaでのJDBCやGoの[database/sql](https://pkg.go.dev/database/sql)がそれにあたります。この仕組みに乗って操作していれば、データベースがMySQLやPostgreSQLでも多くの操作を共通した記述で行うことができるものです。
+クライアントライブラリがSpannerに接続するための専用のライブラリであるのに対して、ドライバーは各言語向けのデータベースを扱うための汎用的な仕組みに沿うようにクライアントライブラリをラップしたものです。具体的にはたとえばJavaでのJDBCやGoの[database/sql](https://pkg.go.dev/database/sql)がそれにあたります。この仕組みに乗って操作していれば、データベースがMySQLやPostgreSQLでも多くの操作を共通した記述で行うことができるものです。
 
 ORマッパーもドライバーの一環として提供されています。たとえばJavaの[Hibernate](https://cloud.google.com/spanner/docs/use-hibernate)やRubyの[Active Record](https://cloud.google.com/spanner/docs/use-active-record)、Pythonの[SQLAlchemy](https://cloud.google.com/spanner/docs/use-sqlalchemy)などです。これらを使えば既存のアプリケーションの移植に際して、SQLの書き換えも必要がありません。
 
@@ -74,7 +74,7 @@ PGAdapterはライブラリや独立したソフトウェアのいずれの方�
 RDBへの接続にはIDとパスワードの組み合わせを利用されることが多いと思います。Spannerの場合は[IAMで認証と認可](https://cloud.google.com/spanner/docs/iam?hl=ja)を行います。
 
 Spannerに限定される話ではありませんが、IAM認証ではアクセスキーを使います。
-固定のアクセスキーをファイルに記述して利用する方法は、漏洩のリスクやローテーションの問題があるため、[サービスカウント](https://cloud.google.com/compute/docs/access/create-enable-service-accounts-for-instances?hl=ja)を利用することがお勧めです。実行環境がAWSやAzureだった場合には[Workload Identity連携](https://cloud.google.com/iam/docs/workload-identity-federation?hl=ja)を使うことで、やはり同様の仕組みは実現可能です。
+固定のアクセスキーをファイルに記述して利用する方法は、漏洩のリスクやローテーションの問題があるため、[サービスアカウント](https://cloud.google.com/compute/docs/access/create-enable-service-accounts-for-instances?hl=ja)を利用することがお勧めです。実行環境がAWSやAzureだった場合には[Workload Identity連携](https://cloud.google.com/iam/docs/workload-identity-federation?hl=ja)を使うことで、やはり同様の仕組みは実現可能です。
 
 クラウドでの認証方式に慣れておられないとIDとパスワードに比べて煩雑に感じられるかもしれませんが、IAMでの認証はクラウドのサービスを使う上では必要な認証になりますし、IAMとデータベースで二重管理にならずローテーションや漏洩のリスクを避ける手段が確立されているというメリットは大きいと思います。
 
@@ -96,9 +96,9 @@ Spannerに限定される話ではありませんが、IAM認証ではアクセ�
 
 ## SQL
 
-Spannerは2種類のSQLをサポートしています。[ANSI準拠のGoogleSQL](https://cloud.google.com/spanner/docs/reference/standard-sql/overview)と[PostgreSQL互換](https://cloud.google.com/spanner/docs/reference/postgresql/overview)です。SQLにはANSI標準があるものの、RDBの実装ごとに拡張が多い言語です。そのため、標準へ準拠によって相互運用性が保証されるわけではありませんが、基本的な構文については互換性があるかなという程度です。
+Spannerは2種類のSQL方言をサポートしています。[ANSI準拠のGoogleSQL](https://cloud.google.com/spanner/docs/reference/standard-sql/overview)と[PostgreSQL互換](https://cloud.google.com/spanner/docs/reference/postgresql/overview)です。SQLにはANSI標準があるものの、RDBの実装ごとに拡張が多い言語です。そのため、標準へ準拠によって相互運用性が保証されるわけではありませんが、基本的な構文については概ね互換性があります。
 
-Goの`database/sql`を使っているアプリケーションをいくつか移植した感触としては、接続部分文字列など明らかに違う部分はあるもののそれ以外の部分は概ね手を付けなくても動作したという実感です。SQLレベルの互換性については、多くの場合はそのままで動作しましたが関数名など表記違いの箇所は書き換えが必要でした。
+MySQLを使っている小さいアプリケーションを数本移植した感触としては、SQLの構文レベルでの互換性があるため多くの場合はそのままで動作しましたが、関数名や引数の取り方など表記違いの箇所は書き換えが必要でした。
 
 ### INSERT 〜 ON DUPLICATE KEY UPDATE
 
