@@ -104,11 +104,11 @@ MySQLを使っている小さいアプリケーションを数本移植した感
 
 MySQLではINSERT時にすでに同じプライマリキーのレコードが存在した場合には更新を、なかったときには追記をするという[構文があります](https://dev.mysql.com/doc/refman/8.0/ja/insert-on-duplicate.html)。PostgreSQLではINSERTの[ON CONFLICT句](https://www.postgresql.jp/document/15/html/sql-insert.html#SQL-ON-CONFLICT)がそれにあたります。
 
-この機能はSpannerでは[INSERT OR UPDATEという構文](https://zenn.dev/google_cloud_jp/articles/cfffd24b356f71)で実現が可能です。この構文がサポートされる前はトランザクション中で`SELECT`による存在確認と、アプリケーションロジックでの分岐によってINSERTとUPDATEを出し分ける必要がありました。この部分の書き換えが大きな移植のハードルでしたが、現在はこの構文を使うことにより書き換え箇所を大幅にへらせるようになりました。
+この機能はSpannerでは[INSERT OR UPDATEという構文](https://zenn.dev/google_cloud_jp/articles/cfffd24b356f71)で実現が可能です。この構文がサポートされる前はトランザクション中で`SELECT`による存在確認と、アプリケーションロジックでの分岐によって`INSERT`と`UPDATE`を出し分ける必要がありました。この部分の書き換えが移植のハードルでしたが、現在はこの構文を使うことにより書き換え箇所を大幅に省略できます。
 
 ## 対話的操作
 
-DBを使うアプリを開発しているとMySQLにおけるmysqlコマンド、PostgreSQLにおけるpsqlのようにCLIでSQLを実行し、サッと結果を確認したい時があると思います。Spannerではクラウドサービスとして提供しているため強力なウェブインターフェイスが提供されていますが、[CLIで操作するためのコマンド](https://github.com/cloudspannerecosystem/spanner-cli)も開発されています。
+DBを使うアプリを開発しているとMySQLにおける`mysql`コマンド、PostgreSQLにおける`psql`のようにCLIでSQLを実行し、サッと結果を確認したい時があると思います。Spannerではクラウドサービスとして提供しているため強力なウェブインターフェイスが提供されていますが、[CLIで操作するためのコマンド](https://github.com/cloudspannerecosystem/spanner-cli)も開発されています。
 
 `SELECT`文のクエリーを実行する、DMLで更新する、トランkザクションを発行する、ヒストリとライン編集機能など基本的な操作がそろっています。その他には実行計画を表形式で表示する、バッチモードで結果をテキストに書き出すなども可能です。Spanner特有の機能としては優先度の指定、トランザクション・リクエストタグをつけて実行なども可能です。
 
