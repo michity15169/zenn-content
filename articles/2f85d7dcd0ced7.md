@@ -34,7 +34,7 @@ Spannerがサポートしている現代的なRDBに求められる機能を列�
 - [JSON型](https://cloud.google.com/spanner/docs/working-with-json?hl=ja)
 - [全文検索](https://cloud.google.com/spanner/docs/full-text-search?hl=ja)
 
-一覧をみて、ひととおり揃っているなと実感いただけるのではないかと思います。
+一覧をみて、一般的なアプリケーションから使う機能は一通り揃っているなと実感いただけるのではないかと思います。
 
 ## 接続ライブラリ
 
@@ -88,7 +88,7 @@ Spannerに限定される話ではありませんが、IAM認証ではアクセ�
 - 一意性がある
 - 追記順（昇順）
 
-このとき単調増加する、つまり追記順が保証されている性質が必要ないのであれば、UUIDなど衝突のおそれが低い文字列を使うという方法もあります。[UUIDをデータベース側で自動生成する](https://zenn.dev/google_cloud_jp/articles/8bc8338a07f7b5#uuid-%E3%81%AE%E8%87%AA%E5%8B%95%E7%94%9F%E6%88%90)ことにより、重複がないという目的は達成することが可能です。
+このとき単調増加する、つまり追記順が保証されている性質が必要ないのであれば、UUIDなど衝突のおそれが低い文字列を使うという方法もあります。[UUIDの自動生成をデフォルトとする](https://zenn.dev/google_cloud_jp/articles/8bc8338a07f7b5#uuid-%E3%81%AE%E8%87%AA%E5%8B%95%E7%94%9F%E6%88%90)ことにより、重複がないという目的は達成することが可能です。
 
 追記順が維持されている必要がある場合には、`BIT_REVERSE`関数が有効です。
 
@@ -152,3 +152,14 @@ SpannerはBigQueryを始め、Google Cloudのサービスと連携できます�
 SpannerのデータをBigQueryで分析したいときには、[DataBoost](https://cloud.google.com/spanner/docs/databoost/databoost-overview?hl=ja)という仕組みを使うことでSpannerのインスタンスに負荷をかけることなくデータが連携できます。逆にBigQueryで分析した結果を書き戻したい場合には、[リバースETL](https://cloud.google.com/bigquery/docs/export-to-spanner?hl=ja)を使えばBigQuery上ではクエリーを書くだけで連携できます。
 
 その他、汎用的なCDCの仕組みである[Datastreamでデータを書き込む](https://cloud.google.com/dataflow/docs/guides/templates/provided/datastream-to-cloud-spanner?hl=ja)、[Vertex AIを使ってMLのモデルで推論](https://cloud.google.com/dataproc-serverless/docs/templates/storage-to-spanner?hl=ja)を行うなども可能です。
+
+## まとめ
+
+この記事では、Spannerを従来のRDBとして活用する方法について解説しました。主なポイントは以下のとおりです。
+
+- Spannerはスケーラビリティだけでなく、従来のリレーショナルデータベースと同様の機能（SQL、トランザクション、データ型など）を備えている。
+- Spannerへの接続には、クライアントライブラリとドライバー（JDBC、ORMなど）の2種類の方法がある。既存アプリケーションの移植にはドライバーの使用が有用です。
+- プライマリキーの設計においては、`AUTO INCREMENT`の代替としてUUIDや`BIT_REVERSE`関数などを検討する必要がある。
+- Spannerはスケーラビリティに加えて、高可用性、メンテナンス不要、グラフデータベース機能、全文検索機能など、多くのメリットを提供する。
+
+これらの点を理解することで、Spannerをより効果的に活用し、アプリケーション開発に役立てることができるでしょう。
