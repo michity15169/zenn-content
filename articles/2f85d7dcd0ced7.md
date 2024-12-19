@@ -80,15 +80,15 @@ Spannerに限定される話ではありませんが、IAM認証ではアクセ�
 
 ## プライマリキー
 
-ここが一番の違いかもしれません。Spannerには`AUTO INCREMENT`はありません。代替としてシーケンスと[BIT_REVERSE関数](https://cloud.google.com/spanner/docs/reference/standard-sql/bit_functions#bit_reverse)があります。
+ここがRDBとSpannerの一番の違いかもしれません。Spannerには`AUTO INCREMENT`はありません。代替としてシーケンスと[BIT_REVERSE関数](https://cloud.google.com/spanner/docs/reference/standard-sql/bit_functions#bit_reverse)があります。
 
-じゃあ、`AUTO INCREMENT`を使っているところは機械的にこれに書き換えればいいかと言うと、ちょっと待ってください。`AUTO INCREMENT`をプライマリキーとして使う場面の多くで必要なのは以下のような条件ではないでしょうか。
+じゃあ、`AUTO INCREMENT`を使っているところは機械的にこれに書き換えればいいかと言うと、それはちょっと待ってください。`AUTO INCREMENT`をプライマリキーとして使う場面の多くで必要なのは以下のような条件ではないでしょうか。
 
 - データベース側で自動採番される
 - 一意性がある
 - 追記順（昇順）
 
-このとき単調増加する、つまり追記順が保証されている性質が必要ないのであれば、UUIDなど衝突のおそれがほぼない文字列を使うという方法もあります。[UUIDの自動生成をデフォルトとする](https://zenn.dev/google_cloud_jp/articles/8bc8338a07f7b5#uuid-%E3%81%AE%E8%87%AA%E5%8B%95%E7%94%9F%E6%88%90)ことにより、データベースで自動的に生成され重複がないという目的は達成することが可能です。
+このとき単調増加する、つまり追記順が保証されている性質が必要ないのであれば、UUIDなど衝突の恐れがほぼない一意な文字列を使うという方法もあります。[UUIDの自動生成をデフォルトとする](https://zenn.dev/google_cloud_jp/articles/8bc8338a07f7b5#uuid-%E3%81%AE%E8%87%AA%E5%8B%95%E7%94%9F%E6%88%90)ことにより、データベースで自動的に生成され重複がないという目的は達成することが可能です。
 
 追記順が維持されている必要がある場合には、`BIT_REVERSE`関数が有効です。
 
@@ -104,11 +104,11 @@ MySQLを使っている小さいアプリケーションを数本移植した感
 
 MySQLではINSERT時にすでに同じプライマリキーのレコードが存在した場合には更新を、なかったときには追記をするという[ INSERT 〜 ON DUPLICATE KEY UPDATE構文があります](https://dev.mysql.com/doc/refman/8.0/ja/insert-on-duplicate.html)。PostgreSQLではINSERTの[ON CONFLICT句](https://www.postgresql.jp/document/15/html/sql-insert.html#SQL-ON-CONFLICT)がそれにあたります。この構文は便利なのでアプリケーションで使われることも多いと思います。
 
-この機能はSpannerでは[INSERT OR UPDATEという構文](https://zenn.dev/google_cloud_jp/articles/cfffd24b356f71)で実現が可能です。この構文がサポートされる前はトランザクション中で`SELECT`による存在確認と、アプリケーションロジックでの分岐によって`INSERT`と`UPDATE`を出し分ける必要がありました。この部分の書き換えはロジックの変更を伴うため移植のハードルでしたが、現在はこの構文を使うことにより書き換え箇所を大幅に省略できます。
+この機能はSpannerの[INSERT OR UPDATEという構文](https://zenn.dev/google_cloud_jp/articles/cfffd24b356f71)で実現が可能です。この構文がサポートされる前はトランザクション中で`SELECT`による存在確認と、アプリケーションロジックでの分岐によって`INSERT`と`UPDATE`を出し分ける必要がありました。この部分の書き換えはロジックの変更を伴うため移植のハードルでしたが、現在はこの構文を使うことにより書き換え箇所を大幅に省略できます。
 
 ## 対話的操作
 
-DBを使うアプリを開発しているとMySQLにおける`mysql`コマンド、PostgreSQLにおける`psql`のようにCLIでSQLを実行し、サッと結果を確認したい時があると思います。Spannerではクラウドサービスとして提供しているため強力なウェブインターフェイスが提供されていますが、[CLIで操作するためのコマンド](https://github.com/cloudspannerecosystem/spanner-cli)も開発されています。
+DBを使うアプリを開発しているとMySQLにおける`mysql`コマンド、PostgreSQLにおける`psql`のようにCLIでSQLを実行し、サッと結果を確認したい時があると思います。Spannerではクラウドサービスとして提供しているため強力なウェブインターフェイスが提供されていますが、[CLIで操作するためのコマンド spanner-cli](https://github.com/cloudspannerecosystem/spanner-cli)も開発されています。
 
 `SELECT`文のクエリーを実行する、DMLで更新する、トランザクションを発行する、ヒストリとライン編集機能など基本的な操作が揃って。その他には実行計画を表形式で表示する、バッチモードで結果をテキストに書き出すなども可能です。Spanner特有の機能としては優先度の指定、トランザクション・リクエストタグをつけて実行なども可能です。
 
@@ -138,7 +138,7 @@ Spannerには内部にコンピュートノードという概念があります�
 
 リレーションデータベースで複数のテーブルをJOINして結果を得るSQLをよく使われると思います。このような処理はグラフ操作でのノード間の接続をたどる操作に相当します。GQLはグラフをたどる処理がシンプルに記述できます。グラフデータベースでなければ絶対に解けない問題は多くありませんが、SQLで記述すると非常に複雑になる処理もGQLで記述するとシンプルに書ける場合があります。GQLとSQLは混ぜて使うこともできるため、グラフ処理で書きやすい部分はGQLでそれ以外の部分はSQLといった混在も可能です。
 
-データ自体はテーブルにあるため、グラフ操作のために既存のテーブルからデータを移動したりデータを同期する仕組みを作る必要がありません。
+データ自体はテーブルにあるため、グラフ操作のために既存のテーブルからデータを移動して二重に持ったり、データを同期する仕組みを作る必要がありません。
 
 ### 全文検索としての機能
 
