@@ -88,7 +88,7 @@ Spannerに限定される話ではありませんが、IAM認証ではアクセ�
 - 一意性がある
 - 追記順（昇順）
 
-このとき単調増加する、つまり追記順が保証されている性質が必要ないのであれば、UUIDなど衝突のおそれが低い文字列を使うという方法もあります。[UUIDの自動生成をデフォルトとする](https://zenn.dev/google_cloud_jp/articles/8bc8338a07f7b5#uuid-%E3%81%AE%E8%87%AA%E5%8B%95%E7%94%9F%E6%88%90)ことにより、重複がないという目的は達成することが可能です。
+このとき単調増加する、つまり追記順が保証されている性質が必要ないのであれば、UUIDなど衝突のおそれがほぼない文字列を使うという方法もあります。[UUIDの自動生成をデフォルトとする](https://zenn.dev/google_cloud_jp/articles/8bc8338a07f7b5#uuid-%E3%81%AE%E8%87%AA%E5%8B%95%E7%94%9F%E6%88%90)ことにより、データベースで自動的に生成され重複がないという目的は達成することが可能です。
 
 追記順が維持されている必要がある場合には、`BIT_REVERSE`関数が有効です。
 
@@ -102,15 +102,15 @@ MySQLを使っている小さいアプリケーションを数本移植した感
 
 ### INSERT 〜 ON DUPLICATE KEY UPDATE
 
-MySQLではINSERT時にすでに同じプライマリキーのレコードが存在した場合には更新を、なかったときには追記をするという[構文があります](https://dev.mysql.com/doc/refman/8.0/ja/insert-on-duplicate.html)。PostgreSQLではINSERTの[ON CONFLICT句](https://www.postgresql.jp/document/15/html/sql-insert.html#SQL-ON-CONFLICT)がそれにあたります。
+MySQLではINSERT時にすでに同じプライマリキーのレコードが存在した場合には更新を、なかったときには追記をするという[ INSERT 〜 ON DUPLICATE KEY UPDATE構文があります](https://dev.mysql.com/doc/refman/8.0/ja/insert-on-duplicate.html)。PostgreSQLではINSERTの[ON CONFLICT句](https://www.postgresql.jp/document/15/html/sql-insert.html#SQL-ON-CONFLICT)がそれにあたります。この構文は便利なのでアプリケーションで使われることも多いと思います。
 
-この機能はSpannerでは[INSERT OR UPDATEという構文](https://zenn.dev/google_cloud_jp/articles/cfffd24b356f71)で実現が可能です。この構文がサポートされる前はトランザクション中で`SELECT`による存在確認と、アプリケーションロジックでの分岐によって`INSERT`と`UPDATE`を出し分ける必要がありました。この部分の書き換えが移植のハードルでしたが、現在はこの構文を使うことにより書き換え箇所を大幅に省略できます。
+この機能はSpannerでは[INSERT OR UPDATEという構文](https://zenn.dev/google_cloud_jp/articles/cfffd24b356f71)で実現が可能です。この構文がサポートされる前はトランザクション中で`SELECT`による存在確認と、アプリケーションロジックでの分岐によって`INSERT`と`UPDATE`を出し分ける必要がありました。この部分の書き換えはロジックの変更を伴うため移植のハードルでしたが、現在はこの構文を使うことにより書き換え箇所を大幅に省略できます。
 
 ## 対話的操作
 
 DBを使うアプリを開発しているとMySQLにおける`mysql`コマンド、PostgreSQLにおける`psql`のようにCLIでSQLを実行し、サッと結果を確認したい時があると思います。Spannerではクラウドサービスとして提供しているため強力なウェブインターフェイスが提供されていますが、[CLIで操作するためのコマンド](https://github.com/cloudspannerecosystem/spanner-cli)も開発されています。
 
-`SELECT`文のクエリーを実行する、DMLで更新する、トランkザクションを発行する、ヒストリとライン編集機能など基本的な操作がそろっています。その他には実行計画を表形式で表示する、バッチモードで結果をテキストに書き出すなども可能です。Spanner特有の機能としては優先度の指定、トランザクション・リクエストタグをつけて実行なども可能です。
+`SELECT`文のクエリーを実行する、DMLで更新する、トランザクションを発行する、ヒストリとライン編集機能など基本的な操作が揃って。その他には実行計画を表形式で表示する、バッチモードで結果をテキストに書き出すなども可能です。Spanner特有の機能としては優先度の指定、トランザクション・リクエストタグをつけて実行なども可能です。
 
 個人的にはロックの挙動を確認するときに、複数のターミナルから横に並べつつ実行してトランザクションを開始してDMLを実行するなどの操作をspanner-cliで行ったりしています。
 
