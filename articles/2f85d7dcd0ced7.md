@@ -22,9 +22,9 @@ Spanner以前にもGoogle社内にはBigtableというキーバリュースト�
 
 Spannerがサポートしている現代的なRDBに求められる機能を列挙してみました。
 
-- SQLによるCRUD
+- [SQLによるCRUD](https://cloud.google.com/spanner/docs/reference/standard-sql/overview)
 - [サブクエリー](https://cloud.google.com/spanner/docs/reference/standard-sql/subqueries)
-- 複数のテーブルへの更新がアトミックに行えるトランザクション
+- [複数のテーブルへの更新がアトミックに行えるトランザクション](https://cloud.google.com/spanner/docs/transactions?hl=ja#read-write_transactions)
 - [データ型](https://cloud.google.com/spanner/docs/reference/standard-sql/data-types)
 - [セカンダリインデックス](https://cloud.google.com/spanner/docs/secondary-indexes?hl=ja)
 - [外部キー](https://cloud.google.com/spanner/docs/foreign-keys/overview?hl=ja)
@@ -106,7 +106,7 @@ MySQLではINSERT時にすでに同じプライマリキーのレコードが存
 
 この機能はSpannerの[INSERT OR UPDATEという構文](https://zenn.dev/google_cloud_jp/articles/cfffd24b356f71)で実現が可能です。この構文がサポートされる前はトランザクション中で`SELECT`による存在確認と、アプリケーションロジックでの分岐によって`INSERT`と`UPDATE`を出し分ける必要がありました。この部分の書き換えはロジックの変更を伴うため移植のハードルでしたが、現在はこの構文を使うことにより書き換え箇所を大幅に省略できます。
 
-## 対話的操作
+## 対話的操作（REPL）
 
 DBを使うアプリを開発しているとMySQLにおける`mysql`コマンド、PostgreSQLにおける`psql`のようにCLIでSQLを実行し、サッと結果を確認したい時があると思います。Spannerではクラウドサービスとして提供しているため強力なウェブインターフェイスが提供されていますが、[CLIで操作するためのコマンド spanner-cli](https://github.com/cloudspannerecosystem/spanner-cli)も開発されています。
 
