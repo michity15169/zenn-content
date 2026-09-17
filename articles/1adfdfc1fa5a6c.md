@@ -12,9 +12,9 @@ publication_name: "google_cloud_jp"
 ---
 
 :::message
-**追記（2026年9月）**
-現在、Cloud Spannerにはスプリットの境界（Split Point）をAPIや`gcloud`コマンドから直接指定して事前分割を行える**Split Point API**（`AddSplitPoints`）が提供されています。
-単にリリース前にテーブルやインデックスを分割しておきたい場合は、本稿のようにダミーデータを投入して負荷をかける必要はなく、空のテーブルに対して数秒で事前分割が完了します。Split Point APIを使った最新の手順については[「Split Point APIを使ったCloud Spannerの事前分割（ウォームアップ）」](https://zenn.dev/google_cloud_jp/articles/9a4f1b2e8c7d30)を参照してください。
+追記（2026年9月）
+現在、Cloud Spannerにはスプリットの境界（Split Point）をAPIや`gcloud`コマンドから直接指定して事前分割を行えるSplit Point API（`AddSplitPoints`）が提供されています。
+リリース前にテーブルやインデックスをあらかじめ分割しておきたい場合は、空のテーブルに対して定義ファイルを適用する形で事前分割を行えます。Split Point APIを使った手順については[「Split Point APIを使ったCloud Spannerの事前分割（ウォームアップ）」](https://zenn.dev/google_cloud_jp/articles/9a4f1b2e8c7d30)を参照してください。
 なお、実際のクエリー負荷をかけてE2EのレイテンシやCPU使用率をベンチマーク検証したい場面や、実行プランの`Executions`から分割数を確認する手法については、本稿の内容が引き続き有効です。
 :::
 
