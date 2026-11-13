@@ -270,10 +270,14 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
         <div class="lane-track">
           <!-- Step 1〜2: まだ分割されていない単一スプリット [1, 1000) -->
           <div class="unified-bar">
-            <div class="ub-left"><code>[1, 500)</code></div>
-            <div class="ub-right state-layer">
-              <span class="st-item ph-1"><code>[1, 1000)</code>（単一スプリット）</span>
-              <span class="st-item ph-2 ub-hot-lbl"><code>[500, 1000)</code> アクセス集中</span>
+            <div class="ub-single state-layer">
+              <span class="st-item ph-1">Split 1: <code>[1, 1000)</code>（境界なし・単一スプリット）</span>
+            </div>
+            <div class="ub-hot-split">
+              <div class="ub-left state-layer"><span class="st-item ph-2"><code>[1, 500)</code></span></div>
+              <div class="ub-right state-layer">
+                <span class="st-item ph-2 ub-hot-lbl"><code>[500, 1000)</code> アクセス集中 (Hot)</span>
+              </div>
             </div>
           </div>
 
@@ -326,7 +330,7 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
           </div>
         </div>
         <div class="lane-track track-drop">
-          <div class="drop-slot"></div>
+          <div class="drop-spacer"></div>
           <div class="drop-slot drop-wide">
             <span class="state-layer">
               <span class="st-item ph-1 hint-txt">待機中</span>
@@ -349,8 +353,8 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
           </div>
         </div>
         <div class="lane-track track-drop-3">
-          <div class="drop-slot"></div>
-          <div class="drop-slot"></div>
+          <div class="drop-spacer"></div>
+          <div class="drop-spacer"></div>
           <div class="drop-slot slot-n3"></div>
         </div>
       </div>
@@ -482,10 +486,12 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   .unified-bar {
     grid-area: 1 / 1; z-index: 3;
     background: var(--n1-bg); border: 2px solid var(--n1); border-radius: 6px;
-    display: grid; grid-template-columns: 1fr 1fr; align-items: stretch; overflow: hidden;
+    display: grid; overflow: hidden;
     font-weight: 700; font-size: 12px; color: var(--n1);
   }
-  .ub-left { display: flex; align-items: center; justify-content: center; opacity: 0.75; }
+  .ub-single { grid-area: 1 / 1; display: grid; align-items: center; text-align: center; padding: 0 6px; }
+  .ub-hot-split { grid-area: 1 / 1; display: grid; grid-template-columns: 1fr 1fr; align-items: stretch; }
+  .ub-left { display: grid; align-items: center; text-align: center; opacity: 0.75; }
   .ub-right { display: grid; align-items: center; text-align: center; padding: 0 4px; }
   .ub-hot-lbl { color: var(--red); }
 
@@ -494,11 +500,12 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
     grid-area: 1 / 1; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 6px; height: 100%;
   }
   .track-drop {
-    grid-area: 1 / 1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; height: 100%;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px; height: 48px;
   }
   .track-drop-3 {
-    grid-area: 1 / 1; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 6px; height: 100%;
+    display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 6px; height: 48px;
   }
+  .drop-spacer { background: transparent; border: none; }
   .sp-block {
     border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center;
     background: var(--n1-bg); border: 1.5px solid var(--n1); color: var(--n1);
@@ -510,8 +517,8 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   .sp-mid { grid-column: 2 / 4; grid-row: 1; }
   .sp-right { grid-column: 3 / 4; grid-row: 1; opacity: 0; pointer-events: none; z-index: 6; }
 
-  .sp-id { font-size: 12px; font-weight: 700; line-height: 1.15; }
-  .sp-sub { font-size: 12px; font-weight: 600; line-height: 1.15; }
+  .sp-id { font-size: 12px; font-weight: 700; line-height: 1.15; text-align: center; justify-items: center; }
+  .sp-sub { font-size: 12px; font-weight: 600; line-height: 1.15; text-align: center; justify-items: center; }
 
   .drop-slot {
     border-radius: 6px; border: 1px dashed var(--border); background: var(--surface);
@@ -527,6 +534,7 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   #sim-auto:checked ~ .matrix-wrap .sp-right    { animation: move-right var(--cycle) infinite; }
   #sim-auto:checked ~ .matrix-wrap .lane-1      { animation: l1-box var(--cycle) infinite; }
   #sim-auto:checked ~ .matrix-wrap .lane-2      { animation: l2-box var(--cycle) infinite; }
+  #sim-auto:checked ~ .matrix-wrap .drop-wide   { animation: drop-vis var(--cycle) infinite; }
   #sim-auto:checked ~ .matrix-wrap .lane-3      { animation: l3-add var(--cycle) infinite; }
   #sim-auto:checked ~ .matrix-wrap .fill-n1     { animation: cpu-n1 var(--cycle) infinite; }
   #sim-auto:checked ~ .matrix-wrap .fill-n2     { animation: cpu-n2 var(--cycle) infinite; }
@@ -570,6 +578,7 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   #sim-p5:checked ~ .matrix-wrap .fill-n2 { width: 42%; background: var(--n2); }
   #sim-p5:checked ~ .matrix-wrap .lane-1 { border-color: var(--n3); }
   #sim-p5:checked ~ .matrix-wrap .lane-2 { border-color: var(--n2); }
+  #sim-p5:checked ~ .matrix-wrap .drop-wide { opacity: 0; }
   #sim-p5:checked ~ .matrix-wrap .lane-3 {
     height: var(--row-h); opacity: 1; padding: 6px 8px; border-width: 1.5px; margin-top: 0;
   }
@@ -621,6 +630,11 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
     82%, 98% { border-color: var(--n2); }
     100% { border-color: var(--border); }
   }
+  @keyframes drop-vis {
+    0%, 58% { opacity: 1; }
+    62%, 98% { opacity: 0; }
+    100% { opacity: 1; }
+  }
   @keyframes l3-add {
     0%, 78% { height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-width: 0; margin-top: calc(-1 * var(--row-gap)); }
     83%, 98% { height: var(--row-h); opacity: 1; padding-top: 6px; padding-bottom: 6px; border-width: 1.5px; margin-top: 0; }
@@ -656,7 +670,7 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
     .cpu-meter { width: 76px; flex-shrink: 0; }
     .lane-track { height: 44px; }
     .ub-left { display: none; }
-    .unified-bar { grid-template-columns: 1fr; }
+    .ub-hot-split { grid-template-columns: 1fr; }
     .split-grid, .track-drop, .track-drop-3 { gap: 3px; }
     .sp-sub { display: none; }
   }
