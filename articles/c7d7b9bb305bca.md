@@ -708,81 +708,191 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
 
 ```html-embed
 <div class="diagram">
+  <input type="radio" name="pk-sim" id="pk-auto" class="pk-radio" checked>
+  <input type="radio" name="pk-sim" id="pk-p1" class="pk-radio">
+  <input type="radio" name="pk-sim" id="pk-p2" class="pk-radio">
+  <input type="radio" name="pk-sim" id="pk-p3" class="pk-radio">
+
+  <div class="pk-toolbar">
+    <div class="pk-tabs">
+      <label for="pk-auto" class="pk-tab pkt-auto">自動再生 (15秒)</label>
+      <label for="pk-p1" class="pk-tab pkt-p1">1. 初期 (1スプリット)</label>
+      <label for="pk-p2" class="pk-tab pkt-p2">2. 分割後 (2ノード)</label>
+      <label for="pk-p3" class="pk-tab pkt-p3">3. さらに分割 (3ノード)</label>
+    </div>
+    <div class="pk-tl"><div class="pk-tl-bar"></div></div>
+    <div class="pk-banner">
+      <div class="pk-ph pkp-1"><strong>Step 1 (初期状態):</strong> どちらのパターンも最初は <code>Node 1</code> 上の1スプリットへ新規書き込みが集中します。</div>
+      <div class="pk-ph pkp-2"><strong>Step 2 (2分割・2ノード):</strong> 単調増加キーは新しい末尾（<code>Node 2</code>）へ負荷が丸ごと移るだけですが、分散キーは2台へ半分ずつ分散します。</div>
+      <div class="pk-ph pkp-3"><strong>Step 3 (3分割・3ノード):</strong> 単調増加キーはホットスポットが <code>Node 3</code> へ移動し続け（Moving Hotspot）、分散キーは全3台へ均等分散されます。</div>
+    </div>
+  </div>
+
   <div class="pk-grid">
-    <div class="pk-card card-bad">
-      <div class="pk-head">
-        <span class="pk-badge badge-red">アンチパターン</span>
-        <span class="pk-title">単調増加キー（連番 / 先頭タイムスタンプ）</span>
+    <!-- 左パネル: 単調増加キー (Moving Hotspot) -->
+    <div class="pk-panel panel-bad">
+      <div class="pk-phead">
+        <span class="pk-badge b-bad">アンチパターン</span>
+        <span class="pk-ptitle">単調増加キー（連番 / タイムスタンプ先頭）</span>
       </div>
-      <div class="pk-desc">スプリットが分割されても、次の新規書き込みは常に「新しい末尾スプリット」へ移動（Moving Hotspot）し、過去のキー範囲は使われず常に1台に負荷が集中します。</div>
-      <div class="split-list">
-        <div class="sp-row mono-row-1">
-          <div class="sp-top">
-            <span class="sp-name">Split 1 (Node 1): <code>[1, 1000)</code></span>
-            <span class="mono-state">
-              <span class="ms-1 load-tag tag-red">書込 100% (ID: 1..999)</span>
-              <span class="ms-2 load-tag tag-zero">分割後: 新規書込 0%</span>
-              <span class="ms-3 load-tag tag-zero">分割後: 新規書込 0%</span>
-            </span>
+      <div class="pk-khead">
+        <span>ノード / CPU</span>
+        <div class="pk-kcols">
+          <span><code>[1,1k)</code></span>
+          <span><code>[1k,2k)</code></span>
+          <span><code>[2k,∞)</code></span>
+        </div>
+      </div>
+
+      <div class="pk-lanes">
+        <div class="pk-row row-bad-1">
+          <div class="pk-ninfo">
+            <div class="pk-ntop">
+              <span class="pk-nname">Node 1</span>
+              <span class="pk-state">
+                <span class="pk-st pkp-1 b-hot">CPU 95%</span>
+                <span class="pk-st pkp-2 b-idle">CPU 5%</span>
+                <span class="pk-st pkp-3 b-idle">CPU 5%</span>
+              </span>
+            </div>
+            <div class="pk-meter"><div class="pk-fill f-bad-1"></div></div>
           </div>
-          <div class="mini-bar"><div class="mini-fill mfill-1"></div></div>
+          <div class="pk-track">
+            <div class="pk-blk blk-bad-1">
+              <span class="blk-rng"><code>[1,1k)</code></span>
+              <span class="pk-state">
+                <span class="pk-st pkp-1 blk-lbl">書込100%</span>
+                <span class="pk-st pkp-2 blk-lbl">書込0%</span>
+                <span class="pk-st pkp-3 blk-lbl">書込0%</span>
+              </span>
+            </div>
+            <div></div><div></div>
+          </div>
         </div>
 
-        <div class="sp-row mono-row-2">
-          <div class="sp-top">
-            <span class="sp-name">Split 2 (Node 2): <code>[1000, 2000)</code></span>
-            <span class="mono-state">
-              <span class="ms-1 load-tag tag-zero">（分割前）</span>
-              <span class="ms-2 load-tag tag-red">書込 100% (ID: 1000..1999)</span>
-              <span class="ms-3 load-tag tag-zero">分割後: 新規書込 0%</span>
-            </span>
+        <div class="pk-row row-bad-2">
+          <div class="pk-ninfo">
+            <div class="pk-ntop">
+              <span class="pk-nname">Node 2</span>
+              <span class="pk-state">
+                <span class="pk-st pkp-2 b-hot">CPU 95%</span>
+                <span class="pk-st pkp-3 b-idle">CPU 5%</span>
+              </span>
+            </div>
+            <div class="pk-meter"><div class="pk-fill f-bad-2"></div></div>
           </div>
-          <div class="mini-bar"><div class="mini-fill mfill-2"></div></div>
+          <div class="pk-track">
+            <div></div>
+            <div class="pk-blk blk-bad-2">
+              <span class="blk-rng"><code>[1k,2k)</code></span>
+              <span class="pk-state">
+                <span class="pk-st pkp-2 blk-lbl">書込100%</span>
+                <span class="pk-st pkp-3 blk-lbl">書込0%</span>
+              </span>
+            </div>
+            <div></div>
+          </div>
         </div>
 
-        <div class="sp-row mono-row-3">
-          <div class="sp-top">
-            <span class="sp-name">Split 3 (Node 3): <code>[2000, ∞)</code></span>
-            <span class="mono-state">
-              <span class="ms-1 load-tag tag-zero">（分割前）</span>
-              <span class="ms-2 load-tag tag-zero">（分割前）</span>
-              <span class="ms-3 load-tag tag-red">書込 100% (ID: 2000..)</span>
-            </span>
+        <div class="pk-row row-bad-3">
+          <div class="pk-ninfo">
+            <div class="pk-ntop">
+              <span class="pk-nname">Node 3</span>
+              <span class="b-hot">CPU 95%</span>
+            </div>
+            <div class="pk-meter"><div class="pk-fill f-bad-3"></div></div>
           </div>
-          <div class="mini-bar"><div class="mini-fill mfill-3"></div></div>
+          <div class="pk-track">
+            <div></div><div></div>
+            <div class="pk-blk blk-bad-3">
+              <span class="blk-rng"><code>[2k,∞)</code></span>
+              <span class="blk-lbl">書込100%</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="pk-card card-good">
-      <div class="pk-head">
-        <span class="pk-badge badge-green">推奨パターン</span>
-        <span class="pk-title">分散キー（UUID v4 / ビット反転 / ハッシュ先頭）</span>
+    <!-- 右パネル: 分散キー (均等分散) -->
+    <div class="pk-panel panel-good">
+      <div class="pk-phead">
+        <span class="pk-badge b-good">推奨パターン</span>
+        <span class="pk-ptitle">分散キー（UUID v4 / ビット反転 / ハッシュ）</span>
       </div>
-      <div class="pk-desc">新しいキー値がキー空間全体に一様に散らばります。分割されたすべてのスプリット（全ノード）へ同時に書き込みが分散され、台数に応じてスケールします。</div>
-      <div class="split-list">
-        <div class="sp-row sp-ok sp-even-1">
-          <div class="sp-top">
-            <span class="sp-name">Split 1 (Node 1): <code>[0000.., 5555..)</code></span>
-            <span class="load-tag tag-green">書込 約33% (<code>2a9f..</code>)</span>
+      <div class="pk-khead">
+        <span>ノード / CPU</span>
+        <div class="pk-kcols">
+          <span><code>00..55</code></span>
+          <span><code>55..aa</code></span>
+          <span><code>aa..ff</code></span>
+        </div>
+      </div>
+
+      <div class="pk-lanes">
+        <div class="pk-row row-good-1">
+          <div class="pk-ninfo">
+            <div class="pk-ntop">
+              <span class="pk-nname">Node 1</span>
+              <span class="pk-state">
+                <span class="pk-st pkp-1 b-hot">CPU 95%</span>
+                <span class="pk-st pkp-2 b-ok">CPU 48%</span>
+                <span class="pk-st pkp-3 b-ok">CPU 32%</span>
+              </span>
+            </div>
+            <div class="pk-meter"><div class="pk-fill f-good-1"></div></div>
           </div>
-          <div class="mini-bar"><div class="mini-fill dfill-1"></div></div>
+          <div class="pk-track">
+            <div class="pk-blk blk-good-1">
+              <span class="blk-rng"><code>2a9f..</code></span>
+              <span class="pk-state">
+                <span class="pk-st pkp-1 blk-lbl">100%</span>
+                <span class="pk-st pkp-2 blk-lbl">約50%</span>
+                <span class="pk-st pkp-3 blk-lbl">約33%</span>
+              </span>
+            </div>
+            <div></div><div></div>
+          </div>
         </div>
 
-        <div class="sp-row sp-ok sp-even-2">
-          <div class="sp-top">
-            <span class="sp-name">Split 2 (Node 2): <code>[5555.., aaaa..)</code></span>
-            <span class="load-tag tag-green">書込 約33% (<code>7c1b..</code>)</span>
+        <div class="pk-row row-good-2">
+          <div class="pk-ninfo">
+            <div class="pk-ntop">
+              <span class="pk-nname">Node 2</span>
+              <span class="pk-state">
+                <span class="pk-st pkp-2 b-ok">CPU 48%</span>
+                <span class="pk-st pkp-3 b-ok">CPU 32%</span>
+              </span>
+            </div>
+            <div class="pk-meter"><div class="pk-fill f-good-2"></div></div>
           </div>
-          <div class="mini-bar"><div class="mini-fill dfill-2"></div></div>
+          <div class="pk-track">
+            <div></div>
+            <div class="pk-blk blk-good-2">
+              <span class="blk-rng"><code>7c1b..</code></span>
+              <span class="pk-state">
+                <span class="pk-st pkp-2 blk-lbl">約50%</span>
+                <span class="pk-st pkp-3 blk-lbl">約33%</span>
+              </span>
+            </div>
+            <div></div>
+          </div>
         </div>
 
-        <div class="sp-row sp-ok sp-even-3">
-          <div class="sp-top">
-            <span class="sp-name">Split 3 (Node 3): <code>[aaaa.., ∞)</code></span>
-            <span class="load-tag tag-green">書込 約33% (<code>e402..</code>)</span>
+        <div class="pk-row row-good-3">
+          <div class="pk-ninfo">
+            <div class="pk-ntop">
+              <span class="pk-nname">Node 3</span>
+              <span class="b-ok">CPU 32%</span>
+            </div>
+            <div class="pk-meter"><div class="pk-fill f-good-3"></div></div>
           </div>
-          <div class="mini-bar"><div class="mini-fill dfill-3"></div></div>
+          <div class="pk-track">
+            <div></div><div></div>
+            <div class="pk-blk blk-good-3">
+              <span class="blk-rng"><code>e402..</code></span>
+              <span class="blk-lbl">約33%</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -793,104 +903,239 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   .diagram {
     --bg: #f8fafc; --surface: #ffffff; --surface-sub: #f1f5f9;
     --text: #0f172a; --text-muted: #475569; --border: #cbd5e1;
+    --meter-bg: #e2e8f0;
+    --primary: #0284c7; --primary-bg: #e0f2fe;
     --green: #15803d; --green-bg: #dcfce7;
     --red: #b91c1c; --red-bg: #fee2e2;
-    --pcycle: 9s;
-    box-sizing: border-box; padding: 12px; background: var(--bg); color: var(--text);
+    --pcycle: 15s;
+    --pk-rh: 48px;
+    --pk-gap: 5px;
+    box-sizing: border-box; padding: 10px; background: var(--bg); color: var(--text);
     border: 1px solid var(--border); border-radius: 10px;
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
-    font-size: 12px; line-height: 1.35;
+    font-size: 12px; line-height: 1.3;
   }
   [data-theme="dark"] .diagram {
     --bg: #0f172a; --surface: #1e293b; --surface-sub: #162032;
     --text: #f1f5f9; --text-muted: #94a3b8; --border: #334155;
+    --meter-bg: #0f172a;
+    --primary: #38bdf8; --primary-bg: #0c4a6e;
     --green: #4ade80; --green-bg: #064e3b;
     --red: #f87171; --red-bg: #450a0a;
   }
   .diagram *, .diagram *::before, .diagram *::after { box-sizing: border-box; }
-  .pk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .pk-card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px;
-    display: flex; flex-direction: column; justify-content: space-between;
+  .pk-radio { display: none; }
+
+  .pk-toolbar {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 7px 10px; margin-bottom: 8px;
   }
-  .card-bad { border: 1.5px solid var(--red); }
-  .card-good { border: 1.5px solid var(--green); }
-  .pk-head { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; flex-wrap: wrap; }
-  .pk-badge { padding: 1px 6px; border-radius: 4px; font-weight: 700; font-size: 12px; }
-  .badge-red { background: var(--red-bg); color: var(--red); }
-  .badge-green { background: var(--green-bg); color: var(--green); }
-  .pk-title { font-weight: 700; font-size: 13px; }
-  .pk-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
-  .split-list { display: flex; flex-direction: column; gap: 5px; }
-  .sp-row {
-    padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-sub);
-    display: flex; flex-direction: column; gap: 4px;
+  .pk-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 5px; }
+  .pk-tab {
+    padding: 2px 7px; border-radius: 4px; font-size: 12px; font-weight: 600;
+    background: var(--surface-sub); color: var(--text-muted); border: 1px solid var(--border);
+    cursor: pointer; user-select: none;
   }
-  .sp-top { display: flex; justify-content: space-between; align-items: center; gap: 4px; flex-wrap: wrap; }
-  .sp-name { font-weight: 700; font-size: 12px; }
-  .mono-state { display: grid; }
-  .ms-1, .ms-2, .ms-3 { grid-area: 1 / 1; opacity: 0; text-align: right; }
-  .ms-1 { animation: mvis-1 var(--pcycle) infinite; }
-  .ms-2 { animation: mvis-2 var(--pcycle) infinite; }
-  .ms-3 { animation: mvis-3 var(--pcycle) infinite; }
-
-  .load-tag { padding: 1px 5px; border-radius: 4px; font-size: 12px; font-weight: 700; }
-  .tag-zero { background: var(--surface); color: var(--text-muted); }
-  .tag-red { background: var(--red-bg); color: var(--red); border: 1px solid var(--red); }
-  .tag-green { background: var(--green-bg); color: var(--green); }
-
-  .mini-bar {
-    width: 100%; height: 6px; background: var(--surface); border-radius: 3px;
-    overflow: hidden; border: 1px solid var(--border);
+  #pk-auto:checked ~ .pk-toolbar .pkt-auto,
+  #pk-p1:checked ~ .pk-toolbar .pkt-p1,
+  #pk-p2:checked ~ .pk-toolbar .pkt-p2,
+  #pk-p3:checked ~ .pk-toolbar .pkt-p3 {
+    background: var(--primary-bg); color: var(--primary); border-color: var(--primary); font-weight: 700;
   }
-  .mini-fill { height: 100%; border-radius: 2px; }
-  .mfill-1 { background: var(--red); animation: mload-1 var(--pcycle) infinite; }
-  .mfill-2 { background: var(--red); animation: mload-2 var(--pcycle) infinite; }
-  .mfill-3 { background: var(--red); animation: mload-3 var(--pcycle) infinite; }
+  .pk-tl { width: 100%; height: 4px; background: var(--surface-sub); border-radius: 2px; overflow: hidden; margin-bottom: 5px; }
+  .pk-tl-bar { height: 100%; background: var(--primary); width: 100%; }
+  #pk-auto:checked ~ .pk-toolbar .pk-tl-bar { animation: pktl var(--pcycle) infinite linear; }
+  #pk-p1:checked ~ .pk-toolbar .pk-tl-bar { width: 33%; }
+  #pk-p2:checked ~ .pk-toolbar .pk-tl-bar { width: 66%; }
+  #pk-p3:checked ~ .pk-toolbar .pk-tl-bar { width: 100%; }
 
-  .sp-ok { background: var(--surface); border-color: var(--green); }
-  .dfill-1, .dfill-2, .dfill-3 {
-    width: 34%; background: var(--green);
-    animation: dload-pulse 2.4s infinite ease-in-out;
+  .pk-banner, .pk-state { display: grid; }
+  .pk-ph, .pk-st { grid-area: 1 / 1; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+
+  #pk-auto:checked ~ * .pkp-1 { animation: pkvis-1 var(--pcycle) infinite; }
+  #pk-auto:checked ~ * .pkp-2 { animation: pkvis-2 var(--pcycle) infinite; }
+  #pk-auto:checked ~ * .pkp-3 { animation: pkvis-3 var(--pcycle) infinite; }
+  #pk-p1:checked ~ * .pkp-1,
+  #pk-p2:checked ~ * .pkp-2,
+  #pk-p3:checked ~ * .pkp-3 { opacity: 1; animation: none !important; }
+
+  .pk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pk-panel {
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: 8px; padding: 8px;
   }
-  .dfill-2 { animation-delay: 0.8s; }
-  .dfill-3 { animation-delay: 1.6s; }
+  .panel-bad { border-color: var(--red); }
+  .panel-good { border-color: var(--green); }
+  .pk-phead { display: flex; align-items: center; gap: 5px; margin-bottom: 6px; flex-wrap: wrap; }
+  .pk-badge { padding: 1px 5px; border-radius: 4px; font-size: 12px; font-weight: 700; }
+  .b-bad { background: var(--red-bg); color: var(--red); }
+  .b-good { background: var(--green-bg); color: var(--green); }
+  .pk-ptitle { font-weight: 700; font-size: 12px; }
 
-  @keyframes mvis-1 { 0%, 30% { opacity: 1; } 33%, 100% { opacity: 0; } }
-  @keyframes mvis-2 { 0%, 31% { opacity: 0; } 33%, 63% { opacity: 1; } 66%, 100% { opacity: 0; } }
-  @keyframes mvis-3 { 0%, 64% { opacity: 0; } 66%, 97% { opacity: 1; } 100% { opacity: 0; } }
+  .pk-khead {
+    display: grid; grid-template-columns: 112px 1fr; gap: 6px;
+    font-size: 12px; font-weight: 700; color: var(--text-muted);
+    padding-bottom: 4px; margin-bottom: 5px; border-bottom: 1px solid var(--border);
+  }
+  .pk-kcols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; text-align: center; }
 
-  @keyframes mload-1 { 0%, 30% { width: 100%; } 33%, 100% { width: 0%; } }
-  @keyframes mload-2 { 0%, 31% { width: 0%; } 33%, 63% { width: 100%; } 66%, 100% { width: 0%; } }
-  @keyframes mload-3 { 0%, 64% { width: 0%; } 66%, 97% { width: 100%; } 100% { width: 0%; } }
+  .pk-lanes { display: flex; flex-direction: column; gap: var(--pk-gap); }
+  .pk-row {
+    display: grid; grid-template-columns: 112px 1fr; gap: 6px; align-items: center;
+    height: var(--pk-rh); padding: 4px 6px; border-radius: 6px;
+    background: var(--surface-sub); border: 1px solid var(--border); overflow: hidden;
+  }
+  .pk-ninfo { display: flex; flex-direction: column; gap: 4px; }
+  .pk-ntop { display: flex; justify-content: space-between; align-items: center; gap: 3px; }
+  .pk-nname { font-weight: 700; font-size: 12px; white-space: nowrap; }
+  .b-hot, .b-ok, .b-idle {
+    display: inline-block; padding: 1px 4px; border-radius: 3px; font-size: 12px; font-weight: 700; white-space: nowrap;
+  }
+  .b-hot { background: var(--red-bg); color: var(--red); }
+  .b-ok { background: var(--green-bg); color: var(--green); }
+  .b-idle { background: var(--surface); color: var(--text-muted); }
 
-  @keyframes dload-pulse {
-    0%, 100% { width: 32%; opacity: 0.85; }
-    50% { width: 38%; opacity: 1; }
+  .pk-meter { width: 100%; height: 8px; background: var(--meter-bg); border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
+  .pk-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease, background 0.4s ease; }
+
+  .pk-track { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; height: 36px; align-items: stretch; }
+  .pk-blk {
+    border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; padding: 2px; text-align: center;
+    border: 1px solid var(--border); background: var(--surface);
+  }
+  .blk-rng { font-size: 12px; line-height: 1.05; }
+  .blk-lbl { font-size: 12px; font-weight: 600; line-height: 1.05; text-align: center; }
+
+  /* 初期は Node 2 / Node 3 を非表示にし、分割ごとに展開 */
+  .row-bad-2, .row-good-2, .row-bad-3, .row-good-3 {
+    height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-width: 0; margin-top: calc(-1 * var(--pk-gap));
+  }
+  .f-bad-3 { width: 95%; background: var(--red); }
+  .blk-bad-3 { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+  .row-bad-3 { border-color: var(--red); }
+  .f-good-3 { width: 32%; background: var(--green); }
+  .blk-good-3 { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+  .row-good-3 { border-color: var(--green); }
+
+  /* 自動再生アニメーション (15秒) */
+  #pk-auto:checked ~ .pk-grid .row-bad-2,
+  #pk-auto:checked ~ .pk-grid .row-good-2 { animation: pk-add-2 var(--pcycle) infinite; }
+  #pk-auto:checked ~ .pk-grid .row-bad-3,
+  #pk-auto:checked ~ .pk-grid .row-good-3 { animation: pk-add-3 var(--pcycle) infinite; }
+  #pk-auto:checked ~ .pk-grid .f-bad-1 { animation: f-bad-1 var(--pcycle) infinite; }
+  #pk-auto:checked ~ .pk-grid .f-bad-2 { animation: f-bad-2 var(--pcycle) infinite; }
+  #pk-auto:checked ~ .pk-grid .blk-bad-1 { animation: b-bad-1 var(--pcycle) infinite; }
+  #pk-auto:checked ~ .pk-grid .blk-bad-2 { animation: b-bad-2 var(--pcycle) infinite; }
+  #pk-auto:checked ~ .pk-grid .f-good-1 { animation: f-good-1 var(--pcycle) infinite; }
+  #pk-auto:checked ~ .pk-grid .f-good-2 { animation: f-good-2 var(--pcycle) infinite; }
+  #pk-auto:checked ~ .pk-grid .blk-good-1 { animation: b-good-1 var(--pcycle) infinite; }
+  #pk-auto:checked ~ .pk-grid .blk-good-2 { animation: b-good-2 var(--pcycle) infinite; }
+
+  /* 手動ステップ固定 */
+  #pk-p1:checked ~ .pk-grid .f-bad-1,
+  #pk-p1:checked ~ .pk-grid .f-good-1 { width: 95%; background: var(--red); }
+  #pk-p1:checked ~ .pk-grid .blk-bad-1,
+  #pk-p1:checked ~ .pk-grid .blk-good-1 { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+
+  #pk-p2:checked ~ .pk-grid .row-bad-2,
+  #pk-p2:checked ~ .pk-grid .row-good-2 { height: var(--pk-rh); opacity: 1; padding: 4px 6px; border-width: 1px; margin-top: 0; }
+  #pk-p2:checked ~ .pk-grid .f-bad-1 { width: 5%; background: var(--text-muted); }
+  #pk-p2:checked ~ .pk-grid .f-bad-2 { width: 95%; background: var(--red); }
+  #pk-p2:checked ~ .pk-grid .blk-bad-2 { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+  #pk-p2:checked ~ .pk-grid .f-good-1,
+  #pk-p2:checked ~ .pk-grid .f-good-2 { width: 48%; background: var(--green); }
+  #pk-p2:checked ~ .pk-grid .blk-good-1,
+  #pk-p2:checked ~ .pk-grid .blk-good-2 { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+
+  #pk-p3:checked ~ .pk-grid .row-bad-2,
+  #pk-p3:checked ~ .pk-grid .row-good-2,
+  #pk-p3:checked ~ .pk-grid .row-bad-3,
+  #pk-p3:checked ~ .pk-grid .row-good-3 { height: var(--pk-rh); opacity: 1; padding: 4px 6px; border-width: 1px; margin-top: 0; }
+  #pk-p3:checked ~ .pk-grid .f-bad-1,
+  #pk-p3:checked ~ .pk-grid .f-bad-2 { width: 5%; background: var(--text-muted); }
+  #pk-p3:checked ~ .pk-grid .f-good-1,
+  #pk-p3:checked ~ .pk-grid .f-good-2 { width: 32%; background: var(--green); }
+  #pk-p3:checked ~ .pk-grid .blk-good-1,
+  #pk-p3:checked ~ .pk-grid .blk-good-2 { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+
+  @keyframes pktl { 0% { width: 0%; } 33% { width: 33%; } 66% { width: 66%; } 100% { width: 100%; } }
+  @keyframes pkvis-1 { 0%, 31% { opacity: 1; } 33%, 100% { opacity: 0; } }
+  @keyframes pkvis-2 { 0%, 32% { opacity: 0; } 33%, 64% { opacity: 1; } 66%, 100% { opacity: 0; } }
+  @keyframes pkvis-3 { 0%, 65% { opacity: 0; } 66%, 98% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes pk-add-2 {
+    0%, 31% { height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-width: 0; margin-top: calc(-1 * var(--pk-gap)); }
+    35%, 98% { height: var(--pk-rh); opacity: 1; padding-top: 4px; padding-bottom: 4px; border-width: 1px; margin-top: 0; }
+    100% { height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-width: 0; margin-top: calc(-1 * var(--pk-gap)); }
+  }
+  @keyframes pk-add-3 {
+    0%, 64% { height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-width: 0; margin-top: calc(-1 * var(--pk-gap)); }
+    68%, 98% { height: var(--pk-rh); opacity: 1; padding-top: 4px; padding-bottom: 4px; border-width: 1px; margin-top: 0; }
+    100% { height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-width: 0; margin-top: calc(-1 * var(--pk-gap)); }
+  }
+  @keyframes f-bad-1 { 0%, 31% { width: 95%; background: var(--red); } 35%, 98% { width: 5%; background: var(--text-muted); } 100% { width: 95%; background: var(--red); } }
+  @keyframes f-bad-2 { 0%, 64% { width: 95%; background: var(--red); } 68%, 98% { width: 5%; background: var(--text-muted); } 100% { width: 95%; background: var(--red); } }
+  @keyframes b-bad-1 {
+    0%, 31% { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+    35%, 98% { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
+    100% { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+  }
+  @keyframes b-bad-2 {
+    0%, 64% { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+    68%, 98% { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
+    100% { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+  }
+  @keyframes f-good-1 {
+    0%, 31% { width: 95%; background: var(--red); }
+    35%, 64% { width: 48%; background: var(--green); }
+    68%, 98% { width: 32%; background: var(--green); }
+    100% { width: 95%; background: var(--red); }
+  }
+  @keyframes f-good-2 {
+    0%, 64% { width: 48%; background: var(--green); }
+    68%, 98% { width: 32%; background: var(--green); }
+    100% { width: 48%; background: var(--green); }
+  }
+  @keyframes b-good-1 {
+    0%, 31% { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+    35%, 98% { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+    100% { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+  }
+  @keyframes b-good-2 {
+    0%, 98% { background: var(--green-bg); border-color: var(--green); color: var(--green); }
   }
 
   @media (max-width: 640px) {
-    .diagram { padding: 8px; }
+    .diagram { padding: 8px; --pk-rh: 38px; --pk-gap: 4px; }
+    .pk-toolbar { padding: 6px 8px; margin-bottom: 6px; }
     .pk-grid { grid-template-columns: 1fr; gap: 6px; }
-    .pk-card { padding: 6px 8px; }
-    .pk-desc { margin-bottom: 4px; }
-    .sp-row { padding: 4px 6px; gap: 2px; }
+    .pk-panel { padding: 6px 8px; }
+    .pk-khead { display: none; }
+    .pk-row { grid-template-columns: 118px 1fr; padding: 3px 5px; }
+    .pk-track { height: 30px; }
+    .blk-rng { display: none; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .diagram *, .diagram *::before, .diagram *::after {
-      animation: none !important; transition: none !important;
-    }
-    .ms-3 { opacity: 1; }
-    .mfill-3 { width: 100%; }
+    .diagram *, .diagram *::before, .diagram *::after { animation: none !important; transition: none !important; }
+    #pk-auto:checked ~ * .pkp-3 { opacity: 1; }
+    #pk-auto:checked ~ .pk-grid .row-bad-2,
+    #pk-auto:checked ~ .pk-grid .row-good-2,
+    #pk-auto:checked ~ .pk-grid .row-bad-3,
+    #pk-auto:checked ~ .pk-grid .row-good-3 { height: var(--pk-rh); opacity: 1; padding: 4px 6px; border-width: 1px; margin-top: 0; }
+    #pk-auto:checked ~ .pk-grid .f-bad-1,
+    #pk-auto:checked ~ .pk-grid .f-bad-2 { width: 5%; background: var(--text-muted); }
+    #pk-auto:checked ~ .pk-grid .f-good-1,
+    #pk-auto:checked ~ .pk-grid .f-good-2 { width: 32%; background: var(--green); }
+    #pk-auto:checked ~ .pk-grid .blk-good-1,
+    #pk-auto:checked ~ .pk-grid .blk-good-2 { background: var(--green-bg); border-color: var(--green); color: var(--green); }
   }
 </style>
 ```
 
-たとえば、`1, 2, 3...`と増え続ける連番や現在時刻をプライマリキーの先頭に置いたとします。すると、新しく`INSERT`される行は常にキー空間の一番末尾にあるスプリット（図のSplit 3）に書き込まれます。
+たとえば、`1, 2, 3...`と増え続ける連番や現在時刻をプライマリキーの先頭に置いたとします。すると、新しく`INSERT`される行は常にキー空間の一番末尾にあるスプリットに書き込まれます。
 
-Spannerが末尾のスプリットの負荷上昇を検知し、`Key: 2000`の位置でスプリットを分割したとしても、その直後にやってくる`2001, 2002...`という書き込みはすべて分割後の最大値側（`[2000, ∞)`）のスプリットへ入ります。つまり、せっかくスプリットを分割しても過去のキー範囲（`[1000, 2000)`）には二度と新規の書き込みが来ず、常に「その時点で一番末尾を担当している1台のサーバー」だけがすべての書き込みを受け止め続けることになります[^4][^5]。これはセカンダリインデックスでも同様であり、更新頻度の高いタイムスタンプ列を先頭にした通常のインデックスを作成すると、インデックス側のスプリット末尾で同じホットスポットが発生します[^5]。
+Spannerが末尾のスプリットの負荷上昇を検知し、`Key: 1000`や`2000`の位置でスプリットを分割したとしても、その直後にやってくる新規の書き込みはすべて分割後の最大値側（図の`[2k, ∞)`）のスプリットへ入ります。つまり、せっかくスプリットを分割しても過去のキー範囲（`[1, 1000)`や`[1000, 2000)`）には二度と新規の書き込みが来ず、常に「その時点で一番末尾を担当している1台のノード」だけがすべての書き込みを受け止め続けることになります[^4][^5]。これはセカンダリインデックスでも同様であり、更新頻度の高いタイムスタンプ列を先頭にした通常のインデックスを作成すると、インデックス側のスプリット末尾で同じホットスポットが発生します[^5]。
 
-これを防ぐため、Spannerでは新しい行のプライマリキーがキー空間全体に散らばるように設計します[^5]。図の右側（推奨パターン）のように、生成されるキーの先頭部分が`2a9f..`、`7c1b..`、`e402..`とばらければ、既存のすべてのスプリット（Server A〜C）へ同時に書き込みが振り分けられ、サーバー台数を増やした分だけ書き込み性能を引き出すことができます。
+これを防ぐため、Spannerでは新しい行のプライマリキーがキー空間全体に散らばるように設計します[^5]。図の右側（推奨パターン）のように、生成されるキーの先頭部分が`2a9f..`、`7c1b..`、`e402..`とばらければ、分割されたすべてのスプリット（Node 1〜3）へ同時に書き込みが振り分けられ、ノード台数を増やした分だけ書き込み性能を引き出すことができます。
 
 キーを分散させる代表的な方法には、ランダムなUUID v4（`NEW_UUID()`関数など）の採用、連番のビット順序を反転させて大きな整数空間へ値を散らすビット反転シーケンス（`bit_reversed_positive`）、あるいは複合プライマリキーの先頭に`UserId`やハッシュ値などのばらつきのある列を置いて2列目にタイムスタンプを置く（`PRIMARY KEY (UserId, LastAccess)`）といった手法があります[^5]。なお、RDBの単調増加する連番とは異なり、Spannerの`IDENTITY`列やそのDDLエイリアスである`AUTO_INCREMENT`（PostgreSQL方言では`SERIAL`）は、内部でこのビット反転シーケンスを使って自動的に値を分散させる仕組みになっています[^8]。
 
