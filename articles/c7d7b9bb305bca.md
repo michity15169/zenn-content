@@ -325,12 +325,11 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
           </div>
         </div>
         <div class="lane-track track-drop">
-          <div class="drop-spacer"></div>
-          <div class="drop-slot drop-wide">
+          <div class="drop-idle">
             <span class="state-layer">
-              <span class="st-item ph-1 hint-txt">待機中（余裕あり）</span>
-              <span class="st-item ph-2 hint-txt">待機中（余裕あり）</span>
-              <span class="st-item ph-3 hint-txt">待機中（余裕あり）</span>
+              <span class="st-item ph-1 hint-txt">担当スプリットなし（余裕あり）</span>
+              <span class="st-item ph-2 hint-txt">担当スプリットなし（余裕あり）</span>
+              <span class="st-item ph-3 hint-txt">担当スプリットなし（余裕あり）</span>
             </span>
           </div>
         </div>
@@ -495,12 +494,15 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
     grid-area: 1 / 1; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 6px; height: 100%;
   }
   .track-drop {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 6px; height: 48px;
+    display: grid; grid-template-columns: 1fr; height: 48px;
   }
   .track-drop-3 {
     display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 6px; height: 48px;
   }
   .drop-spacer { background: transparent; border: none; }
+  .drop-idle {
+    display: flex; align-items: center; justify-content: center; height: 100%;
+  }
   .sp-block {
     border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center;
     background: var(--n1-bg); border: 1.5px solid var(--n1); color: var(--n1);
@@ -528,7 +530,7 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   #sim-auto:checked ~ .matrix-wrap .sp-right    { animation: move-right var(--cycle) infinite; }
   #sim-auto:checked ~ .matrix-wrap .lane-1      { animation: l1-box var(--cycle) infinite; }
   #sim-auto:checked ~ .matrix-wrap .lane-2      { animation: l2-box var(--cycle) infinite; }
-  #sim-auto:checked ~ .matrix-wrap .drop-wide   { animation: drop-vis var(--cycle) infinite; }
+  #sim-auto:checked ~ .matrix-wrap .drop-idle   { animation: drop-vis var(--cycle) infinite; }
   #sim-auto:checked ~ .matrix-wrap .lane-3      { animation: l3-add var(--cycle) infinite; }
   #sim-auto:checked ~ .matrix-wrap .fill-n1     { animation: cpu-n1 var(--cycle) infinite; }
   #sim-auto:checked ~ .matrix-wrap .fill-n2     { animation: cpu-n2 var(--cycle) infinite; }
@@ -571,7 +573,8 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   #sim-p5:checked ~ .matrix-wrap .fill-n2 { width: 42%; background: var(--n2); }
   #sim-p5:checked ~ .matrix-wrap .lane-1 { border-color: var(--n3); }
   #sim-p5:checked ~ .matrix-wrap .lane-2 { border-color: var(--n2); }
-  #sim-p5:checked ~ .matrix-wrap .drop-wide { opacity: 0; }
+  #sim-p4:checked ~ .matrix-wrap .drop-idle,
+  #sim-p5:checked ~ .matrix-wrap .drop-idle { opacity: 0; }
   #sim-p5:checked ~ .matrix-wrap .lane-3 {
     height: var(--row-h); opacity: 1; padding: 6px 8px; border-width: 1.5px; margin-top: 0;
   }
