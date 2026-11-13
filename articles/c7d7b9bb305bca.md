@@ -908,7 +908,7 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
     --green: #15803d; --green-bg: #dcfce7;
     --red: #b91c1c; --red-bg: #fee2e2;
     --pcycle: 15s;
-    --pk-rh: 48px;
+    --pk-rh: 54px;
     --pk-gap: 5px;
     box-sizing: border-box; padding: 10px; background: var(--bg); color: var(--text);
     border: 1px solid var(--border); border-radius: 10px;
@@ -972,7 +972,7 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   .pk-ptitle { font-weight: 700; font-size: 12px; }
 
   .pk-khead {
-    display: grid; grid-template-columns: 112px 1fr; gap: 6px;
+    display: grid; grid-template-columns: 104px 1fr; gap: 6px;
     font-size: 12px; font-weight: 700; color: var(--text-muted);
     padding-bottom: 4px; margin-bottom: 5px; border-bottom: 1px solid var(--border);
   }
@@ -980,7 +980,7 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
 
   .pk-lanes { display: flex; flex-direction: column; gap: var(--pk-gap); }
   .pk-row {
-    display: grid; grid-template-columns: 112px 1fr; gap: 6px; align-items: center;
+    display: grid; grid-template-columns: 104px 1fr; gap: 6px; align-items: center;
     height: var(--pk-rh); padding: 4px 6px; border-radius: 6px;
     background: var(--surface-sub); border: 1px solid var(--border); overflow: hidden;
   }
@@ -997,10 +997,10 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   .pk-meter { width: 100%; height: 8px; background: var(--meter-bg); border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
   .pk-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease, background 0.4s ease; }
 
-  .pk-track { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; height: 36px; align-items: stretch; }
+  .pk-track { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; height: 42px; align-items: stretch; }
   .pk-blk {
     border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    font-size: 12px; font-weight: 700; padding: 2px; text-align: center;
+    font-size: 12px; font-weight: 700; padding: 2px; text-align: center; white-space: nowrap;
     border: 1px solid var(--border); background: var(--surface);
   }
   .blk-rng { font-size: 12px; line-height: 1.05; }
