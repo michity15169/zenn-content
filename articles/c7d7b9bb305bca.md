@@ -207,90 +207,142 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
 
 たとえテーブル全体のデータサイズが小さくても、特定の10行だけにアクセスが集中していれば、Spannerはその10行の1行ずつにスプリット境界を差し込み、それぞれを別々のサーバーに担当させて負荷を逃がすという動作を行います。
 
-負荷の集中を検知してからスプリットを分割し、別サーバーへ再配置するまでの流れを3つのステップに分けて見てみます。
+負荷の集中を検知してからスプリット境界を設定して分割し、既存ノード間での負荷分散、さらにノード追加（スケールアウト）による負荷分散へと推移する一連の流れを1つの図解で見てみます（デフォルトで自動再生され、上部のボタンで各フェーズに固定することもできます）。
 
 ```html-embed
 <div class="diagram">
-  <div class="step-list">
-    <div class="step-box">
-      <div class="step-header">
-        <span class="step-num">Step 1</span>
-        <span class="step-title">特定のキー範囲への負荷集中（ホットスポットの発生）</span>
+  <input type="radio" name="sp-sim" id="sim-auto" class="sim-radio" checked>
+  <input type="radio" name="sp-sim" id="sim-p1" class="sim-radio">
+  <input type="radio" name="sp-sim" id="sim-p2" class="sim-radio">
+  <input type="radio" name="sp-sim" id="sim-p3" class="sim-radio">
+  <input type="radio" name="sp-sim" id="sim-p4" class="sim-radio">
+
+  <div class="sim-toolbar">
+    <div class="sim-tabs">
+      <label for="sim-auto" class="sim-tab tab-auto">自動再生 (ループ)</label>
+      <label for="sim-p1" class="sim-tab tab-p1">1. 初期 (単一Split)</label>
+      <label for="sim-p2" class="sim-tab tab-p2">2. 負荷集中・境界設定</label>
+      <label for="sim-p3" class="sim-tab tab-p3">3. 分割・ノード間分散</label>
+      <label for="sim-p4" class="sim-tab tab-p4">4. ノード追加で分散</label>
+    </div>
+    <div class="tl-bar"><div class="tl-progress"></div></div>
+    <div class="phase-banner">
+      <div class="ph-text ph-1"><strong>Phase 1 (初期状態):</strong> 1つのスプリット（Split 1）に全キー <code>[1, 1000)</code> が格納され、Node 1の1台で処理されています。</div>
+      <div class="ph-text ph-2"><strong>Phase 2 (アクセス集中と境界設定):</strong> <code>[400, 600)</code> にアクセスが集中してNode 1が高負荷になり、ホットな範囲にスプリット境界（破線）が設定されます。</div>
+      <div class="ph-text ph-3"><strong>Phase 3 (スプリット分割と負荷分散):</strong> 境界で分割された <code>Split 1b</code> が余裕のあるNode 2へ移動し、2台のノードへ負荷が分散されます。</div>
+      <div class="ph-text ph-4"><strong>Phase 4 (ノード追加による分散):</strong> スケールアウトで追加されたNode 3へ <code>Split 1c</code> が移動し、3台すべてで均等に負荷が分散されます。</div>
+    </div>
+  </div>
+
+  <div class="section-box">
+    <div class="section-head">
+      <span class="section-title">論理キー空間（<code>Key: [1, 1000)</code>）とスプリット境界の推移</span>
+      <span class="state-layer">
+        <span class="st-item ph-1 badge-blue">境界なし（単一スプリット: Split 1）</span>
+        <span class="st-item ph-2 badge-red">境界（400, 500, 600）を自動設定</span>
+        <span class="st-item ph-3 badge-amber">4スプリットへ分割 → Split 1b を Node 2 へ</span>
+        <span class="st-item ph-4 badge-green">Split 1c を追加された Node 3 へ移動</span>
+      </span>
+    </div>
+
+    <div class="keyspace-track">
+      <div class="ks-seg ks-1a">
+        <div class="ks-range"><code>[1, 400)</code></div>
+        <div class="ks-meta state-layer">
+          <span class="st-item ph-1">Split 1（連続領域）</span>
+          <span class="st-item ph-2">Split 1a（低負荷）</span>
+          <span class="st-item ph-3">Split 1a (Node 1)</span>
+          <span class="st-item ph-4">Split 1a (Node 1)</span>
+        </div>
       </div>
-      <div class="step-body">
-        <div class="srv-row">
-          <div class="srv-card srv-hot">
-            <div class="srv-top">
-              <span class="srv-label">Server A（Split 1: <code>[1, 1000)</code>）</span>
-              <span class="status-tag tag-hot">CPU 高負荷 (Hot)</span>
-            </div>
-            <div class="key-bar">
-              <div class="key-seg seg-cold">Key: <code>[1, 400)</code></div>
-              <div class="key-seg seg-hot">Key: <code>[400, 410)</code> (アクセス集中)</div>
-              <div class="key-seg seg-cold">Key: <code>[410, 1000)</code></div>
-            </div>
-          </div>
-          <div class="srv-card srv-idle">
-            <div class="srv-top">
-              <span class="srv-label">Server B / C</span>
-              <span class="status-tag tag-idle">余裕あり</span>
-            </div>
-            <div class="idle-note">担当スプリットなし（または低負荷）</div>
-          </div>
+
+      <div class="ks-seg ks-1b">
+        <div class="ks-range"><code>[400, 500)</code></div>
+        <div class="ks-meta state-layer">
+          <span class="st-item ph-1">Split 1（連続領域）</span>
+          <span class="st-item ph-2 txt-hot">高負荷 → 境界で分割</span>
+          <span class="st-item ph-3 txt-move">Split 1b → Node 2 へ移動</span>
+          <span class="st-item ph-4 txt-ok">Split 1b (Node 2 担当)</span>
+        </div>
+      </div>
+
+      <div class="ks-seg ks-1c">
+        <div class="ks-range"><code>[500, 600)</code></div>
+        <div class="ks-meta state-layer">
+          <span class="st-item ph-1">Split 1（連続領域）</span>
+          <span class="st-item ph-2 txt-hot">高負荷 → 境界で分割</span>
+          <span class="st-item ph-3 txt-warn">Split 1c (Node 1 残存)</span>
+          <span class="st-item ph-4 txt-move">Split 1c → Node 3 へ移動</span>
+        </div>
+      </div>
+
+      <div class="ks-seg ks-1d">
+        <div class="ks-range"><code>[600, 1000)</code></div>
+        <div class="ks-meta state-layer">
+          <span class="st-item ph-1">Split 1（連続領域）</span>
+          <span class="st-item ph-2">Split 1d（低負荷）</span>
+          <span class="st-item ph-3">Split 1d (Node 1)</span>
+          <span class="st-item ph-4">Split 1d (Node 1)</span>
         </div>
       </div>
     </div>
+  </div>
 
-    <div class="step-box">
-      <div class="step-header">
-        <span class="step-num">Step 2</span>
-        <span class="step-title">スプリット境界（Split Boundary）の自動追加</span>
+  <div class="nodes-grid">
+    <div class="node-card node-1">
+      <div class="node-head">
+        <span class="node-name">Node 1 (Server A)</span>
+        <span class="state-layer">
+          <span class="st-item ph-1 badge-blue">CPU 25%</span>
+          <span class="st-item ph-2 badge-red">CPU 95% (Hot)</span>
+          <span class="st-item ph-3 badge-amber">CPU 58% (緩和)</span>
+          <span class="st-item ph-4 badge-green">CPU 32% (解消)</span>
+        </span>
       </div>
-      <div class="step-body">
-        <div class="srv-card srv-warn">
-          <div class="srv-top">
-            <span class="srv-label">Server A</span>
-            <span class="status-tag tag-warn">バックグラウンドで分割実行</span>
-          </div>
-          <div class="split-3-grid">
-            <div class="split-piece piece-cold">Split 1a: <code>[1, 400)</code></div>
-            <div class="split-piece piece-hot piece-cut-1">Split 1b: <code>[400, 405)</code></div>
-            <div class="split-piece piece-hot piece-cut-2">Split 1c: <code>[405, 410)</code></div>
-            <div class="split-piece piece-cold">Split 1d: <code>[410, 1000)</code></div>
-          </div>
-        </div>
+      <div class="cpu-bar-bg"><div class="cpu-bar-fill fill-n1"></div></div>
+      <div class="node-splits state-layer">
+        <div class="st-item ph-1 pill-box pill-blue">担当: <code>Split 1 [1, 1000)</code></div>
+        <div class="st-item ph-2 pill-box pill-red">担当: <code>Split 1</code> (境界を追加中)</div>
+        <div class="st-item ph-3 pill-box pill-amber">担当: <code>Split 1a, 1c, 1d</code></div>
+        <div class="st-item ph-4 pill-box pill-green">担当: <code>Split 1a, 1d</code> (低負荷)</div>
       </div>
     </div>
 
-    <div class="step-box">
-      <div class="step-header">
-        <span class="step-num">Step 3</span>
-        <span class="step-title">別サーバーへのスプリット移動と負荷分散の完了</span>
+    <div class="node-card node-2">
+      <div class="node-head">
+        <span class="node-name">Node 2 (Server B)</span>
+        <span class="state-layer">
+          <span class="st-item ph-1 badge-muted">CPU 15%</span>
+          <span class="st-item ph-2 badge-muted">CPU 15%</span>
+          <span class="st-item ph-3 badge-blue">CPU 52% (分担)</span>
+          <span class="st-item ph-4 badge-green">CPU 34% (安定)</span>
+        </span>
       </div>
-      <div class="step-body">
-        <div class="srv-3-grid">
-          <div class="srv-card srv-ok">
-            <div class="srv-top">
-              <span class="srv-label">Server A</span>
-              <span class="status-tag tag-ok">負荷解消</span>
-            </div>
-            <div class="moved-pill">Split 1a <code>[1, 400)</code> + 1d</div>
-          </div>
-          <div class="srv-card srv-ok">
-            <div class="srv-top">
-              <span class="srv-label">Server B</span>
-              <span class="status-tag tag-ok">負荷分散</span>
-            </div>
-            <div class="moved-pill pill-active migrate-b">→ Split 1b <code>[400, 405)</code></div>
-          </div>
-          <div class="srv-card srv-ok">
-            <div class="srv-top">
-              <span class="srv-label">Server C</span>
-              <span class="status-tag tag-ok">負荷分散</span>
-            </div>
-            <div class="moved-pill pill-active migrate-c">→ Split 1c <code>[405, 410)</code></div>
-          </div>
-        </div>
+      <div class="cpu-bar-bg"><div class="cpu-bar-fill fill-n2"></div></div>
+      <div class="node-splits state-layer">
+        <div class="st-item ph-1 pill-box pill-muted">担当: 他スプリット / 余裕あり</div>
+        <div class="st-item ph-2 pill-box pill-muted">担当: 他スプリット / 余裕あり</div>
+        <div class="st-item ph-3 pill-box pill-blue">移動完了: <code>Split 1b [400, 500)</code></div>
+        <div class="st-item ph-4 pill-box pill-green">担当: <code>Split 1b [400, 500)</code></div>
+      </div>
+    </div>
+
+    <div class="node-card node-3">
+      <div class="node-head">
+        <span class="node-name">Node 3 (追加ノード)</span>
+        <span class="state-layer">
+          <span class="st-item ph-1 badge-muted">未追加</span>
+          <span class="st-item ph-2 badge-muted">未追加</span>
+          <span class="st-item ph-3 badge-muted">スケールアウト前</span>
+          <span class="st-item ph-4 badge-green">CPU 34% (追加・分担)</span>
+        </span>
+      </div>
+      <div class="cpu-bar-bg"><div class="cpu-bar-fill fill-n3"></div></div>
+      <div class="node-splits state-layer">
+        <div class="st-item ph-1 pill-box pill-dashed">（ノード追加前）</div>
+        <div class="st-item ph-2 pill-box pill-dashed">（ノード追加前）</div>
+        <div class="st-item ph-3 pill-box pill-dashed">（ノード追加でさらに分散可能）</div>
+        <div class="st-item ph-4 pill-box pill-blue">移動完了: <code>Split 1c [500, 600)</code></div>
       </div>
     </div>
   </div>
@@ -304,6 +356,7 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
     --green: #15803d; --green-bg: #dcfce7;
     --amber: #b45309; --amber-bg: #fef3c7;
     --red: #b91c1c; --red-bg: #fee2e2;
+    --cycle: 12s;
     box-sizing: border-box; padding: 12px; background: var(--bg); color: var(--text);
     border: 1px solid var(--border); border-radius: 10px;
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
@@ -318,88 +371,267 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
     --red: #f87171; --red-bg: #450a0a;
   }
   .diagram *, .diagram *::before, .diagram *::after { box-sizing: border-box; }
-  .step-list { display: flex; flex-direction: column; gap: 8px; }
-  .step-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
-  .step-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-  .step-num {
-    background: var(--primary-bg); color: var(--primary); font-weight: 700;
-    padding: 1px 6px; border-radius: 4px; font-size: 12px; flex-shrink: 0;
+  .sim-radio { display: none; }
+
+  .sim-toolbar {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; margin-bottom: 8px;
   }
-  .step-title { font-weight: 700; font-size: 13px; }
-  .srv-row { display: grid; grid-template-columns: 1.7fr 1fr; gap: 8px; }
-  .srv-3-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-  .srv-card {
-    background: var(--surface-sub); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px;
+  .sim-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+  .sim-tab {
+    padding: 2px 7px; border-radius: 4px; font-size: 12px; font-weight: 600;
+    background: var(--surface-sub); color: var(--text-muted); border: 1px solid var(--border);
+    cursor: pointer; user-select: none;
   }
-  .srv-hot { border: 1.5px solid var(--red); }
-  .srv-warn { border: 1.5px dashed var(--amber); }
-  .srv-ok { border: 1.5px solid var(--green); }
-  .srv-idle { border-style: dashed; }
-  .srv-top { display: flex; justify-content: space-between; align-items: center; gap: 4px; margin-bottom: 5px; flex-wrap: wrap; }
-  .srv-label { font-weight: 700; font-size: 12px; }
-  .status-tag { padding: 1px 5px; border-radius: 4px; font-size: 12px; font-weight: 700; }
-  .tag-hot { background: var(--red-bg); color: var(--red); animation: hot-pulse 1.8s infinite ease-in-out; }
-  .tag-warn { background: var(--amber-bg); color: var(--amber); }
-  .tag-ok { background: var(--green-bg); color: var(--green); }
-  .tag-idle { background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); }
-  .key-bar { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 3px; }
-  .key-seg { padding: 3px 4px; border-radius: 4px; text-align: center; font-size: 12px; }
-  .seg-cold { background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); }
-  .seg-hot {
-    background: var(--red-bg); border: 1px solid var(--red); color: var(--red); font-weight: 700;
-    animation: hot-pulse 1.8s infinite ease-in-out;
+  #sim-auto:checked ~ .sim-toolbar .tab-auto,
+  #sim-p1:checked ~ .sim-toolbar .tab-p1,
+  #sim-p2:checked ~ .sim-toolbar .tab-p2,
+  #sim-p3:checked ~ .sim-toolbar .tab-p3,
+  #sim-p4:checked ~ .sim-toolbar .tab-p4 {
+    background: var(--primary-bg); color: var(--primary); border-color: var(--primary); font-weight: 700;
   }
-  .idle-note { color: var(--text-muted); font-size: 12px; text-align: center; padding: 3px 0; }
-  .split-3-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
-  .split-piece { padding: 3px 4px; border-radius: 4px; text-align: center; font-size: 12px; }
-  .piece-cold { background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); }
-  .piece-hot {
-    background: var(--amber-bg); border: 1.5px dashed var(--amber); color: var(--amber); font-weight: 700;
-    animation: split-cut 2.4s infinite ease-in-out;
+
+  .tl-bar {
+    width: 100%; height: 4px; background: var(--surface-sub); border-radius: 2px;
+    overflow: hidden; margin-bottom: 6px;
   }
-  .piece-cut-2 { animation-delay: 0.4s; }
-  .moved-pill {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
-    padding: 3px 6px; text-align: center; font-size: 12px;
+  .tl-progress { height: 100%; background: var(--primary); width: 100%; }
+  #sim-auto:checked ~ .sim-toolbar .tl-progress { animation: tl-run var(--cycle) infinite linear; }
+  #sim-p1:checked ~ .sim-toolbar .tl-progress { width: 25%; }
+  #sim-p2:checked ~ .sim-toolbar .tl-progress { width: 50%; background: var(--red); }
+  #sim-p3:checked ~ .sim-toolbar .tl-progress { width: 75%; background: var(--amber); }
+  #sim-p4:checked ~ .sim-toolbar .tl-progress { width: 100%; background: var(--green); }
+
+  .phase-banner, .state-layer { display: grid; }
+  .ph-text, .st-item {
+    grid-area: 1 / 1; opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
   }
-  .pill-active {
-    background: var(--primary-bg); border-color: var(--primary); color: var(--primary); font-weight: 700;
-    animation: split-migrate 2.6s infinite ease-in-out;
+  .ph-text { font-size: 12px; color: var(--text); }
+
+  /* Auto-play 4-phase visibility keyframes */
+  #sim-auto:checked ~ * .ph-1 { animation: vis-p1 var(--cycle) infinite; }
+  #sim-auto:checked ~ * .ph-2 { animation: vis-p2 var(--cycle) infinite; }
+  #sim-auto:checked ~ * .ph-3 { animation: vis-p3 var(--cycle) infinite; }
+  #sim-auto:checked ~ * .ph-4 { animation: vis-p4 var(--cycle) infinite; }
+
+  /* Manual phase selection */
+  #sim-p1:checked ~ * .ph-1,
+  #sim-p2:checked ~ * .ph-2,
+  #sim-p3:checked ~ * .ph-3,
+  #sim-p4:checked ~ * .ph-4 { opacity: 1; animation: none !important; }
+
+  .section-box {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; margin-bottom: 8px;
   }
-  .migrate-c { animation-delay: 0.5s; }
-  @keyframes hot-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 transparent; transform: scale(1); }
-    50% { box-shadow: 0 0 0 3px var(--red-bg); transform: scale(1.015); }
+  .section-head {
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
+    gap: 6px; margin-bottom: 6px;
   }
-  @keyframes split-cut {
-    0%, 100% { transform: translateX(0); box-shadow: 0 0 0 0 transparent; }
-    50% { transform: translateY(-1px); box-shadow: 0 2px 6px var(--amber-bg); }
+  .section-title { font-weight: 700; font-size: 12px; }
+
+  .badge-blue, .badge-red, .badge-amber, .badge-green, .badge-muted {
+    display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 12px; font-weight: 700; text-align: right;
   }
-  @keyframes split-migrate {
-    0%, 100% { transform: translateX(0); box-shadow: 0 0 0 0 transparent; }
-    40% { transform: translateX(3px); box-shadow: 0 0 0 2px var(--primary-bg); }
+  .badge-blue { background: var(--primary-bg); color: var(--primary); }
+  .badge-red { background: var(--red-bg); color: var(--red); }
+  .badge-amber { background: var(--amber-bg); color: var(--amber); }
+  .badge-green { background: var(--green-bg); color: var(--green); }
+  .badge-muted { background: var(--surface-sub); color: var(--text-muted); }
+
+  /* Keyspace Track & Split Boundary Animation */
+  .keyspace-track {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 6px; transition: gap 0.3s ease;
   }
+  .ks-seg {
+    padding: 6px 4px; border-radius: 6px; text-align: center;
+    background: var(--surface-sub); border: 1.5px solid var(--border);
+  }
+  .ks-range { font-weight: 700; font-size: 12px; margin-bottom: 2px; }
+  .ks-meta { font-size: 12px; color: var(--text-muted); }
+  .txt-hot { color: var(--red); font-weight: 700; }
+  .txt-warn { color: var(--amber); font-weight: 700; }
+  .txt-move { color: var(--primary); font-weight: 700; }
+  .txt-ok { color: var(--green); font-weight: 700; }
+
+  #sim-auto:checked ~ .section-box .keyspace-track { animation: ks-gap var(--cycle) infinite; }
+  #sim-auto:checked ~ .section-box .ks-1a,
+  #sim-auto:checked ~ .section-box .ks-1d { animation: ks-cold-style var(--cycle) infinite; }
+  #sim-auto:checked ~ .section-box .ks-1b { animation: ks-1b-style var(--cycle) infinite; }
+  #sim-auto:checked ~ .section-box .ks-1c { animation: ks-1c-style var(--cycle) infinite; }
+
+  #sim-p1:checked ~ .section-box .keyspace-track { gap: 0; }
+  #sim-p1:checked ~ .section-box .ks-seg { border-radius: 0; border-color: var(--primary); background: var(--primary-bg); }
+  #sim-p2:checked ~ .section-box .ks-1b,
+  #sim-p2:checked ~ .section-box .ks-1c { border: 1.5px dashed var(--red); background: var(--red-bg); }
+  #sim-p3:checked ~ .section-box .ks-1b { border-color: var(--primary); background: var(--primary-bg); }
+  #sim-p3:checked ~ .section-box .ks-1c { border: 1.5px dashed var(--amber); background: var(--amber-bg); }
+  #sim-p4:checked ~ .section-box .ks-1b,
+  #sim-p4:checked ~ .section-box .ks-1c { border-color: var(--green); background: var(--green-bg); }
+
+  /* Nodes Grid & CPU Bars */
+  .nodes-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .node-card {
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: 8px;
+    padding: 8px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .node-head { display: flex; justify-content: space-between; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .node-name { font-weight: 700; font-size: 12px; }
+  .cpu-bar-bg {
+    width: 100%; height: 8px; background: var(--surface-sub); border-radius: 4px;
+    overflow: hidden; border: 1px solid var(--border);
+  }
+  .cpu-bar-fill { height: 100%; border-radius: 3px; width: 25%; background: var(--primary); transition: width 0.4s ease, background 0.4s ease; }
+
+  #sim-auto:checked ~ .nodes-grid .fill-n1 { animation: cpu-n1 var(--cycle) infinite; }
+  #sim-auto:checked ~ .nodes-grid .fill-n2 { animation: cpu-n2 var(--cycle) infinite; }
+  #sim-auto:checked ~ .nodes-grid .fill-n3 { animation: cpu-n3 var(--cycle) infinite; }
+  #sim-auto:checked ~ .nodes-grid .node-1 { animation: node1-card var(--cycle) infinite; }
+  #sim-auto:checked ~ .nodes-grid .node-2 { animation: node2-card var(--cycle) infinite; }
+  #sim-auto:checked ~ .nodes-grid .node-3 { animation: node3-card var(--cycle) infinite; }
+
+  #sim-p1:checked ~ .nodes-grid .fill-n1 { width: 25%; background: var(--primary); }
+  #sim-p2:checked ~ .nodes-grid .fill-n1 { width: 95%; background: var(--red); }
+  #sim-p3:checked ~ .nodes-grid .fill-n1 { width: 58%; background: var(--amber); }
+  #sim-p4:checked ~ .nodes-grid .fill-n1 { width: 32%; background: var(--green); }
+
+  #sim-p1:checked ~ .nodes-grid .fill-n2,
+  #sim-p2:checked ~ .nodes-grid .fill-n2 { width: 15%; background: var(--text-muted); }
+  #sim-p3:checked ~ .nodes-grid .fill-n2 { width: 52%; background: var(--primary); }
+  #sim-p4:checked ~ .nodes-grid .fill-n2 { width: 34%; background: var(--green); }
+
+  #sim-p1:checked ~ .nodes-grid .fill-n3,
+  #sim-p2:checked ~ .nodes-grid .fill-n3,
+  #sim-p3:checked ~ .nodes-grid .fill-n3 { width: 0%; }
+  #sim-p4:checked ~ .nodes-grid .fill-n3 { width: 34%; background: var(--green); }
+
+  #sim-p1:checked ~ .nodes-grid .node-3,
+  #sim-p2:checked ~ .nodes-grid .node-3,
+  #sim-p3:checked ~ .nodes-grid .node-3 { border-style: dashed; opacity: 0.65; }
+  #sim-p4:checked ~ .nodes-grid .node-3 { border-color: var(--green); opacity: 1; }
+
+  .pill-box {
+    padding: 4px 6px; border-radius: 4px; font-size: 12px; text-align: center; font-weight: 600;
+  }
+  .pill-blue { background: var(--primary-bg); color: var(--primary); border: 1px solid var(--primary); }
+  .pill-red { background: var(--red-bg); color: var(--red); border: 1px solid var(--red); }
+  .pill-amber { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber); }
+  .pill-green { background: var(--green-bg); color: var(--green); border: 1px solid var(--green); }
+  .pill-muted { background: var(--surface-sub); color: var(--text-muted); border: 1px solid var(--border); }
+  .pill-dashed { background: var(--surface-sub); color: var(--text-muted); border: 1px dashed var(--border); }
+
+  @keyframes tl-run {
+    0% { width: 0%; background: var(--primary); }
+    24% { width: 25%; background: var(--primary); }
+    25% { width: 25%; background: var(--red); }
+    49% { width: 50%; background: var(--red); }
+    50% { width: 50%; background: var(--amber); }
+    74% { width: 75%; background: var(--amber); }
+    75% { width: 75%; background: var(--green); }
+    100% { width: 100%; background: var(--green); }
+  }
+  @keyframes vis-p1 {
+    0%, 22% { opacity: 1; }
+    25%, 100% { opacity: 0; }
+  }
+  @keyframes vis-p2 {
+    0%, 23% { opacity: 0; }
+    25%, 47% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+  @keyframes vis-p3 {
+    0%, 48% { opacity: 0; }
+    50%, 72% { opacity: 1; }
+    75%, 100% { opacity: 0; }
+  }
+  @keyframes vis-p4 {
+    0%, 73% { opacity: 0; }
+    75%, 97% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  @keyframes ks-gap {
+    0%, 22% { gap: 0px; }
+    25%, 97% { gap: 6px; }
+    100% { gap: 0px; }
+  }
+  @keyframes ks-cold-style {
+    0%, 22% { background: var(--primary-bg); border: 1.5px solid var(--primary); border-radius: 0; }
+    25%, 97% { background: var(--surface-sub); border: 1.5px solid var(--border); border-radius: 6px; }
+    100% { background: var(--primary-bg); border: 1.5px solid var(--primary); border-radius: 0; }
+  }
+  @keyframes ks-1b-style {
+    0%, 22% { background: var(--primary-bg); border: 1.5px solid var(--primary); border-radius: 0; }
+    25%, 47% { background: var(--red-bg); border: 1.5px dashed var(--red); border-radius: 6px; }
+    50%, 72% { background: var(--primary-bg); border: 1.5px solid var(--primary); border-radius: 6px; }
+    75%, 97% { background: var(--green-bg); border: 1.5px solid var(--green); border-radius: 6px; }
+    100% { background: var(--primary-bg); border: 1.5px solid var(--primary); border-radius: 0; }
+  }
+  @keyframes ks-1c-style {
+    0%, 22% { background: var(--primary-bg); border: 1.5px solid var(--primary); border-radius: 0; }
+    25%, 47% { background: var(--red-bg); border: 1.5px dashed var(--red); border-radius: 6px; }
+    50%, 72% { background: var(--amber-bg); border: 1.5px dashed var(--amber); border-radius: 6px; }
+    75%, 97% { background: var(--green-bg); border: 1.5px solid var(--green); border-radius: 6px; }
+    100% { background: var(--primary-bg); border: 1.5px solid var(--primary); border-radius: 0; }
+  }
+  @keyframes cpu-n1 {
+    0%, 22% { width: 25%; background: var(--primary); }
+    25%, 47% { width: 95%; background: var(--red); }
+    50%, 72% { width: 58%; background: var(--amber); }
+    75%, 97% { width: 32%; background: var(--green); }
+    100% { width: 25%; background: var(--primary); }
+  }
+  @keyframes cpu-n2 {
+    0%, 47% { width: 15%; background: var(--text-muted); }
+    50%, 72% { width: 52%; background: var(--primary); }
+    75%, 97% { width: 34%; background: var(--green); }
+    100% { width: 15%; background: var(--text-muted); }
+  }
+  @keyframes cpu-n3 {
+    0%, 72% { width: 0%; background: var(--text-muted); }
+    75%, 97% { width: 34%; background: var(--green); }
+    100% { width: 0%; background: var(--text-muted); }
+  }
+  @keyframes node1-card {
+    0%, 22% { border-color: var(--primary); }
+    25%, 47% { border-color: var(--red); }
+    50%, 72% { border-color: var(--amber); }
+    75%, 97% { border-color: var(--green); }
+    100% { border-color: var(--primary); }
+  }
+  @keyframes node2-card {
+    0%, 47% { border-color: var(--border); }
+    50%, 72% { border-color: var(--primary); }
+    75%, 97% { border-color: var(--green); }
+    100% { border-color: var(--border); }
+  }
+  @keyframes node3-card {
+    0%, 72% { border-style: dashed; border-color: var(--border); opacity: 0.65; }
+    75%, 97% { border-style: solid; border-color: var(--green); opacity: 1; }
+    100% { border-style: dashed; border-color: var(--border); opacity: 0.65; }
+  }
+
   @media (max-width: 640px) {
     .diagram { padding: 8px; }
-    .step-box { padding: 6px 8px; }
-    .srv-row, .srv-3-grid { grid-template-columns: 1fr; gap: 4px; }
-    .key-bar { grid-template-columns: 1fr; gap: 2px; }
-    .split-3-grid { grid-template-columns: 1fr 1fr; gap: 3px; }
-    .idle-note { display: none; }
+    .sim-toolbar, .section-box { padding: 6px 8px; margin-bottom: 6px; }
+    .keyspace-track { grid-template-columns: 1fr 1fr; gap: 4px; }
+    .nodes-grid { grid-template-columns: 1fr; gap: 5px; }
+    .node-card { padding: 6px 8px; gap: 4px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .diagram *, .diagram *::before, .diagram *::after {
       animation: none !important; transition: none !important;
     }
+    #sim-auto:checked ~ * .ph-4 { opacity: 1; }
   }
 </style>
 ```
 
-まずStep 1では、`Key: [1, 1000)`を受け持つ1つのスプリット（Split 1）がServer Aに配置されています。このうち`[400, 410)`の範囲にアクセスが集中すると、Server AのCPU使用率が上昇します。Spanner内部では、単一サーバーのリソース制約に対してスプリットの負荷が50%を超えた状態を「Warm」、100%に達してリクエストのレイテンシに影響が出うる状態を「Hot（ホットスポット）」として検知します[^4]。
+まずPhase 1（初期状態）では、`Key: [1, 1000)`を受け持つ1つのスプリット（Split 1）に全データが格納され、Node 1の1台で処理されています。このうち`[400, 600)`の範囲にアクセスが集中すると、Node 1のCPU使用率が急上昇します。Spanner内部では、単一サーバーのリソース制約に対してスプリットの負荷が50%を超えた状態を「Warm」、100%に達してリクエストのレイテンシに影響が出うる状態を「Hot（ホットスポット）」として検知します[^4]。
 
-続いてStep 2では、Spannerがバックグラウンドで負荷の高いキー範囲の前後や内部に新しいスプリット境界を追加し、`Split 1a`〜`1d`へと細かく分割します[^1][^4]。このとき、最小で1行単位までスプリットの境界を狭めることができます[^1]。
+続いてPhase 2（境界設定）では、Spannerがバックグラウンドで負荷の高いキー範囲の前後や内部（`400`、`500`、`600`）に新しいスプリット境界を追加し、`Split 1a`〜`1d`へと細かく分割します[^1][^4]。このとき、最小で1行単位までスプリットの境界を狭めることができます[^1]。
 
-最後にStep 3では、分割された`Split 1b`と`Split 1c`をインスタンス内の余裕があるServer BやServer Cへ移動させます。これにより、当初はServer Aの1台だけで受けていた集中アクセスが複数のサーバーで並列に処理されるようになり、数分おきに段階的にスループットが改善していきます[^1]。反対に、アクセスが落ち着いて負荷の低い状態が続いたスプリット同士は、再び自動的に統合（マージ）されます[^3]。
+Phase 3（分割と負荷分散）では、分割された`Split 1b`をインスタンス内の余裕があるNode 2へ移動させます。さらにトラフィックが増加してノードが追加（スケールアウト）されたPhase 4では、新しく追加されたNode 3へ`Split 1c`が再配置されます。このように、当初は1つのスプリット・1台のノードだけで受けていた集中アクセスが、スプリット分割と移動によって複数のノードで並列に処理されるようになり、段階的に各ノードの負荷が下がってスループットが向上していきます[^1]。反対に、アクセスが落ち着いて負荷の低い状態が続いたスプリット同士は、再び自動的に統合（マージ）されます[^3]。
 
 ### 自動分割にかかる時間と事前分割（Pre-splitting）
 
@@ -423,22 +655,42 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
         <span class="pk-badge badge-red">アンチパターン</span>
         <span class="pk-title">単調増加キー（連番 / 先頭タイムスタンプ）</span>
       </div>
-      <div class="pk-desc">新しい書き込みが常にキー空間の末尾（最大値側）に集中します。スプリットを分割しても、次の新規行はすべて分割後の「新しい末尾スプリット」へ入るため、常に1台のサーバーに負荷が集中し続けます。</div>
+      <div class="pk-desc">スプリットが分割されても、次の新規書き込みは常に「新しい末尾スプリット」へ移動（Moving Hotspot）し、過去のキー範囲は使われず常に1台に負荷が集中します。</div>
       <div class="split-list">
-        <div class="sp-row sp-cold">
-          <span class="sp-name">Split 1 (Server A)</span>
-          <span class="sp-range">Key: <code>[1, 1000)</code></span>
-          <span class="sp-load load-zero">新規書込 0%</span>
+        <div class="sp-row mono-row-1">
+          <div class="sp-top">
+            <span class="sp-name">Split 1 (Node 1): <code>[1, 1000)</code></span>
+            <span class="mono-state">
+              <span class="ms-1 load-tag tag-red">書込 100% (ID: 1..999)</span>
+              <span class="ms-2 load-tag tag-zero">分割後: 新規書込 0%</span>
+              <span class="ms-3 load-tag tag-zero">分割後: 新規書込 0%</span>
+            </span>
+          </div>
+          <div class="mini-bar"><div class="mini-fill mfill-1"></div></div>
         </div>
-        <div class="sp-row sp-cold">
-          <span class="sp-name">Split 2 (Server B)</span>
-          <span class="sp-range">Key: <code>[1000, 2000)</code></span>
-          <span class="sp-load load-zero">新規書込 0%</span>
+
+        <div class="sp-row mono-row-2">
+          <div class="sp-top">
+            <span class="sp-name">Split 2 (Node 2): <code>[1000, 2000)</code></span>
+            <span class="mono-state">
+              <span class="ms-1 load-tag tag-zero">（分割前）</span>
+              <span class="ms-2 load-tag tag-red">書込 100% (ID: 1000..1999)</span>
+              <span class="ms-3 load-tag tag-zero">分割後: 新規書込 0%</span>
+            </span>
+          </div>
+          <div class="mini-bar"><div class="mini-fill mfill-2"></div></div>
         </div>
-        <div class="sp-row sp-hot">
-          <span class="sp-name">Split 3 (Server C)</span>
-          <span class="sp-range">Key: <code>[2000, ∞)</code> ⇐ ID: 2001, 2002...</span>
-          <span class="sp-load load-full">書込 100% 集中</span>
+
+        <div class="sp-row mono-row-3">
+          <div class="sp-top">
+            <span class="sp-name">Split 3 (Node 3): <code>[2000, ∞)</code></span>
+            <span class="mono-state">
+              <span class="ms-1 load-tag tag-zero">（分割前）</span>
+              <span class="ms-2 load-tag tag-zero">（分割前）</span>
+              <span class="ms-3 load-tag tag-red">書込 100% (ID: 2000..)</span>
+            </span>
+          </div>
+          <div class="mini-bar"><div class="mini-fill mfill-3"></div></div>
         </div>
       </div>
     </div>
@@ -448,22 +700,30 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
         <span class="pk-badge badge-green">推奨パターン</span>
         <span class="pk-title">分散キー（UUID v4 / ビット反転 / ハッシュ先頭）</span>
       </div>
-      <div class="pk-desc">新しいキー値がキー空間全体にランダム（一様）に散らばります。分割されたすべてのスプリットへ同時に書き込みが振り分けられるため、サーバー台数に応じて書き込み性能がスケールします。</div>
+      <div class="pk-desc">新しいキー値がキー空間全体に一様に散らばります。分割されたすべてのスプリット（全ノード）へ同時に書き込みが分散され、台数に応じてスケールします。</div>
       <div class="split-list">
         <div class="sp-row sp-ok sp-even-1">
-          <span class="sp-name">Split 1 (Server A)</span>
-          <span class="sp-range">Key: <code>[0000.., 5555..)</code> ⇐ <code>2a9f..</code></span>
-          <span class="sp-load load-even">書込 約33%</span>
+          <div class="sp-top">
+            <span class="sp-name">Split 1 (Node 1): <code>[0000.., 5555..)</code></span>
+            <span class="load-tag tag-green">書込 約33% (<code>2a9f..</code>)</span>
+          </div>
+          <div class="mini-bar"><div class="mini-fill dfill-1"></div></div>
         </div>
+
         <div class="sp-row sp-ok sp-even-2">
-          <span class="sp-name">Split 2 (Server B)</span>
-          <span class="sp-range">Key: <code>[5555.., aaaa..)</code> ⇐ <code>7c1b..</code></span>
-          <span class="sp-load load-even">書込 約33%</span>
+          <div class="sp-top">
+            <span class="sp-name">Split 2 (Node 2): <code>[5555.., aaaa..)</code></span>
+            <span class="load-tag tag-green">書込 約33% (<code>7c1b..</code>)</span>
+          </div>
+          <div class="mini-bar"><div class="mini-fill dfill-2"></div></div>
         </div>
+
         <div class="sp-row sp-ok sp-even-3">
-          <span class="sp-name">Split 3 (Server C)</span>
-          <span class="sp-range">Key: <code>[aaaa.., ∞)</code> ⇐ <code>e402..</code></span>
-          <span class="sp-load load-even">書込 約33%</span>
+          <div class="sp-top">
+            <span class="sp-name">Split 3 (Node 3): <code>[aaaa.., ∞)</code></span>
+            <span class="load-tag tag-green">書込 約33% (<code>e402..</code>)</span>
+          </div>
+          <div class="mini-bar"><div class="mini-fill dfill-3"></div></div>
         </div>
       </div>
     </div>
@@ -476,10 +736,11 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
     --text: #0f172a; --text-muted: #475569; --border: #cbd5e1;
     --green: #15803d; --green-bg: #dcfce7;
     --red: #b91c1c; --red-bg: #fee2e2;
+    --pcycle: 9s;
     box-sizing: border-box; padding: 12px; background: var(--bg); color: var(--text);
     border: 1px solid var(--border); border-radius: 10px;
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
-    font-size: 12px; line-height: 1.4;
+    font-size: 12px; line-height: 1.35;
   }
   [data-theme="dark"] .diagram {
     --bg: #0f172a; --surface: #1e293b; --surface-sub: #162032;
@@ -490,12 +751,12 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   .diagram *, .diagram *::before, .diagram *::after { box-sizing: border-box; }
   .pk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .pk-card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px;
     display: flex; flex-direction: column; justify-content: space-between;
   }
   .card-bad { border: 1.5px solid var(--red); }
   .card-good { border: 1.5px solid var(--green); }
-  .pk-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
+  .pk-head { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; flex-wrap: wrap; }
   .pk-badge { padding: 1px 6px; border-radius: 4px; font-weight: 700; font-size: 12px; }
   .badge-red { background: var(--red-bg); color: var(--red); }
   .badge-green { background: var(--green-bg); color: var(--green); }
@@ -503,47 +764,65 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   .pk-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
   .split-list { display: flex; flex-direction: column; gap: 5px; }
   .sp-row {
-    display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap;
     padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-sub);
+    display: flex; flex-direction: column; gap: 4px;
   }
-  .sp-cold { opacity: 0.75; }
-  .sp-hot {
-    background: var(--red-bg); border-color: var(--red);
-    animation: mono-hotspot 1.6s infinite ease-in-out;
-  }
-  .sp-ok {
-    background: var(--surface); border-color: var(--green);
-    animation: dist-write 2.4s infinite ease-in-out;
-  }
-  .sp-even-1 { animation-delay: 0s; }
-  .sp-even-2 { animation-delay: 0.8s; }
-  .sp-even-3 { animation-delay: 1.6s; }
+  .sp-top { display: flex; justify-content: space-between; align-items: center; gap: 4px; flex-wrap: wrap; }
   .sp-name { font-weight: 700; font-size: 12px; }
-  .sp-range { font-size: 12px; color: var(--text-muted); }
-  .sp-hot .sp-range { color: var(--red); font-weight: 600; }
-  .sp-load { padding: 1px 6px; border-radius: 4px; font-size: 12px; font-weight: 700; }
-  .load-zero { background: var(--surface); color: var(--text-muted); }
-  .load-full { background: var(--surface); color: var(--red); border: 1px solid var(--red); }
-  .load-even { background: var(--green-bg); color: var(--green); }
-  @keyframes mono-hotspot {
-    0%, 100% { box-shadow: 0 0 0 0 transparent; transform: scale(1); }
-    50% { box-shadow: 0 0 0 3px var(--red-bg); transform: scale(1.01); }
+  .mono-state { display: grid; }
+  .ms-1, .ms-2, .ms-3 { grid-area: 1 / 1; opacity: 0; text-align: right; }
+  .ms-1 { animation: mvis-1 var(--pcycle) infinite; }
+  .ms-2 { animation: mvis-2 var(--pcycle) infinite; }
+  .ms-3 { animation: mvis-3 var(--pcycle) infinite; }
+
+  .load-tag { padding: 1px 5px; border-radius: 4px; font-size: 12px; font-weight: 700; }
+  .tag-zero { background: var(--surface); color: var(--text-muted); }
+  .tag-red { background: var(--red-bg); color: var(--red); border: 1px solid var(--red); }
+  .tag-green { background: var(--green-bg); color: var(--green); }
+
+  .mini-bar {
+    width: 100%; height: 6px; background: var(--surface); border-radius: 3px;
+    overflow: hidden; border: 1px solid var(--border);
   }
-  @keyframes dist-write {
-    0%, 100% { box-shadow: 0 0 0 0 transparent; }
-    35% { box-shadow: 0 0 0 2px var(--green-bg); background: var(--green-bg); }
+  .mini-fill { height: 100%; border-radius: 2px; }
+  .mfill-1 { background: var(--red); animation: mload-1 var(--pcycle) infinite; }
+  .mfill-2 { background: var(--red); animation: mload-2 var(--pcycle) infinite; }
+  .mfill-3 { background: var(--red); animation: mload-3 var(--pcycle) infinite; }
+
+  .sp-ok { background: var(--surface); border-color: var(--green); }
+  .dfill-1, .dfill-2, .dfill-3 {
+    width: 34%; background: var(--green);
+    animation: dload-pulse 2.4s infinite ease-in-out;
   }
+  .dfill-2 { animation-delay: 0.8s; }
+  .dfill-3 { animation-delay: 1.6s; }
+
+  @keyframes mvis-1 { 0%, 30% { opacity: 1; } 33%, 100% { opacity: 0; } }
+  @keyframes mvis-2 { 0%, 31% { opacity: 0; } 33%, 63% { opacity: 1; } 66%, 100% { opacity: 0; } }
+  @keyframes mvis-3 { 0%, 64% { opacity: 0; } 66%, 97% { opacity: 1; } 100% { opacity: 0; } }
+
+  @keyframes mload-1 { 0%, 30% { width: 100%; } 33%, 100% { width: 0%; } }
+  @keyframes mload-2 { 0%, 31% { width: 0%; } 33%, 63% { width: 100%; } 66%, 100% { width: 0%; } }
+  @keyframes mload-3 { 0%, 64% { width: 0%; } 66%, 97% { width: 100%; } 100% { width: 0%; } }
+
+  @keyframes dload-pulse {
+    0%, 100% { width: 32%; opacity: 0.85; }
+    50% { width: 38%; opacity: 1; }
+  }
+
   @media (max-width: 640px) {
     .diagram { padding: 8px; }
-    .pk-grid { grid-template-columns: 1fr; gap: 8px; }
-    .pk-card { padding: 8px 10px; }
-    .pk-desc { margin-bottom: 6px; }
-    .sp-row { padding: 4px 6px; }
+    .pk-grid { grid-template-columns: 1fr; gap: 6px; }
+    .pk-card { padding: 6px 8px; }
+    .pk-desc { margin-bottom: 4px; }
+    .sp-row { padding: 4px 6px; gap: 2px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .diagram *, .diagram *::before, .diagram *::after {
       animation: none !important; transition: none !important;
     }
+    .ms-3 { opacity: 1; }
+    .mfill-3 { width: 100%; }
   }
 </style>
 ```
