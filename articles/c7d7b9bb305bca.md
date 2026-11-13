@@ -44,7 +44,10 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
       <div class="card-desc">1台のプライマリが全行を処理します。限界を超えるとアプリ側で接続先DBを分ける必要があります。</div>
       <div class="flow-box">
         <div class="app-row">アプリケーション（振り分けロジックが必要）</div>
-        <div class="arrow-down" aria-hidden="true">↓</div>
+        <div class="arrow-down" aria-hidden="true">
+          <span class="flow-track"><span class="flow-dot dot-muted"></span></span>
+          <span>↓ 手動振り分け</span>
+        </div>
         <div class="server-grid-2">
           <div class="srv-box srv-neutral">
             <div class="srv-name">DB Server 1</div>
@@ -66,17 +69,20 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
       <div class="card-desc">アプリからは単一テーブルに見え、裏側でキー範囲（Split）ごとに別サーバーへ自動配置されます。</div>
       <div class="flow-box">
         <div class="app-row app-spanner">アプリケーション（単一の <code>Users</code> テーブルとしてアクセス）</div>
-        <div class="arrow-down arrow-primary" aria-hidden="true">↓ Spanner API ルーティング</div>
+        <div class="arrow-down arrow-primary" aria-hidden="true">
+          <span class="flow-track"><span class="flow-dot dot-primary"></span></span>
+          <span>↓ Spanner API 自動ルーティング</span>
+        </div>
         <div class="server-grid-3">
-          <div class="srv-box srv-active">
+          <div class="srv-box srv-active srv-anim-1">
             <div class="srv-name">Server A</div>
             <div class="range-pill pill-primary">Split 1<br><code>[1, 3500)</code></div>
           </div>
-          <div class="srv-box srv-active">
+          <div class="srv-box srv-active srv-anim-2">
             <div class="srv-name">Server B</div>
             <div class="range-pill pill-primary">Split 2<br><code>[3500, 7200)</code></div>
           </div>
-          <div class="srv-box srv-active">
+          <div class="srv-box srv-active srv-anim-3">
             <div class="srv-name">Server C</div>
             <div class="range-pill pill-primary">Split 3<br><code>[7200, ∞)</code></div>
           </div>
@@ -122,27 +128,61 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
     padding: 6px 8px; text-align: center; font-size: 12px; font-weight: 600;
   }
   .app-spanner { border-color: var(--primary); background: var(--primary-bg); color: var(--primary); }
-  .arrow-down { text-align: center; font-size: 12px; color: var(--text-muted); font-weight: 700; line-height: 1.1; }
+  .arrow-down {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    font-size: 12px; color: var(--text-muted); font-weight: 700; line-height: 1.1;
+  }
   .arrow-primary { color: var(--primary); }
+  .flow-track {
+    position: relative; display: inline-block; width: 6px; height: 18px;
+    background: var(--border); border-radius: 3px; overflow: hidden;
+  }
+  .flow-dot {
+    position: absolute; left: 0; top: -6px; width: 6px; height: 6px; border-radius: 50%;
+    animation: flow-drop 1.8s infinite ease-in-out;
+  }
+  .dot-muted { background: var(--text-muted); }
+  .dot-primary { background: var(--primary); }
   .server-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .server-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
   .srv-box {
     background: var(--surface-sub); border: 1px solid var(--border); border-radius: 6px;
     padding: 6px; text-align: center; display: flex; flex-direction: column; gap: 4px;
   }
-  .srv-active { background: var(--surface); border-color: var(--primary); }
+  .srv-active {
+    background: var(--surface); border-color: var(--primary);
+    animation: srv-receive 2.4s infinite ease-in-out;
+  }
+  .srv-anim-1 { animation-delay: 0s; }
+  .srv-anim-2 { animation-delay: 0.8s; }
+  .srv-anim-3 { animation-delay: 1.6s; }
   .srv-name { font-size: 12px; font-weight: 700; }
   .range-pill {
     font-size: 12px; padding: 3px 4px; border-radius: 4px; line-height: 1.25;
   }
   .pill-neutral { background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); }
   .pill-primary { background: var(--primary-bg); color: var(--primary); font-weight: 600; }
+  @keyframes flow-drop {
+    0% { top: -6px; opacity: 0; }
+    30% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { top: 18px; opacity: 0; }
+  }
+  @keyframes srv-receive {
+    0%, 100% { box-shadow: 0 0 0 0 transparent; }
+    50% { box-shadow: 0 0 0 2px var(--primary-bg); }
+  }
   @media (max-width: 640px) {
     .diagram { padding: 10px; }
     .compare-grid { grid-template-columns: 1fr; gap: 8px; }
     .compare-card { padding: 8px 10px; }
     .card-desc { margin-bottom: 6px; }
     .range-pill br { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .diagram *, .diagram *::before, .diagram *::after {
+      animation: none !important; transition: none !important;
+    }
   }
 </style>
 ```
@@ -214,8 +254,8 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
           </div>
           <div class="split-3-grid">
             <div class="split-piece piece-cold">Split 1a: <code>[1, 400)</code></div>
-            <div class="split-piece piece-hot">Split 1b: <code>[400, 405)</code></div>
-            <div class="split-piece piece-hot">Split 1c: <code>[405, 410)</code></div>
+            <div class="split-piece piece-hot piece-cut-1">Split 1b: <code>[400, 405)</code></div>
+            <div class="split-piece piece-hot piece-cut-2">Split 1c: <code>[405, 410)</code></div>
             <div class="split-piece piece-cold">Split 1d: <code>[410, 1000)</code></div>
           </div>
         </div>
@@ -241,14 +281,14 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
               <span class="srv-label">Server B</span>
               <span class="status-tag tag-ok">負荷分散</span>
             </div>
-            <div class="moved-pill pill-active">Split 1b <code>[400, 405)</code></div>
+            <div class="moved-pill pill-active migrate-b">→ Split 1b <code>[400, 405)</code></div>
           </div>
           <div class="srv-card srv-ok">
             <div class="srv-top">
               <span class="srv-label">Server C</span>
               <span class="status-tag tag-ok">負荷分散</span>
             </div>
-            <div class="moved-pill pill-active">Split 1c <code>[405, 410)</code></div>
+            <div class="moved-pill pill-active migrate-c">→ Split 1c <code>[405, 410)</code></div>
           </div>
         </div>
       </div>
@@ -298,24 +338,47 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   .srv-top { display: flex; justify-content: space-between; align-items: center; gap: 4px; margin-bottom: 5px; flex-wrap: wrap; }
   .srv-label { font-weight: 700; font-size: 12px; }
   .status-tag { padding: 1px 5px; border-radius: 4px; font-size: 12px; font-weight: 700; }
-  .tag-hot { background: var(--red-bg); color: var(--red); }
+  .tag-hot { background: var(--red-bg); color: var(--red); animation: hot-pulse 1.8s infinite ease-in-out; }
   .tag-warn { background: var(--amber-bg); color: var(--amber); }
   .tag-ok { background: var(--green-bg); color: var(--green); }
   .tag-idle { background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); }
   .key-bar { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 3px; }
   .key-seg { padding: 3px 4px; border-radius: 4px; text-align: center; font-size: 12px; }
   .seg-cold { background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); }
-  .seg-hot { background: var(--red-bg); border: 1px solid var(--red); color: var(--red); font-weight: 700; }
+  .seg-hot {
+    background: var(--red-bg); border: 1px solid var(--red); color: var(--red); font-weight: 700;
+    animation: hot-pulse 1.8s infinite ease-in-out;
+  }
   .idle-note { color: var(--text-muted); font-size: 12px; text-align: center; padding: 3px 0; }
   .split-3-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
   .split-piece { padding: 3px 4px; border-radius: 4px; text-align: center; font-size: 12px; }
   .piece-cold { background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); }
-  .piece-hot { background: var(--amber-bg); border: 1.5px dashed var(--amber); color: var(--amber); font-weight: 700; }
+  .piece-hot {
+    background: var(--amber-bg); border: 1.5px dashed var(--amber); color: var(--amber); font-weight: 700;
+    animation: split-cut 2.4s infinite ease-in-out;
+  }
+  .piece-cut-2 { animation-delay: 0.4s; }
   .moved-pill {
     background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
     padding: 3px 6px; text-align: center; font-size: 12px;
   }
-  .pill-active { background: var(--primary-bg); border-color: var(--primary); color: var(--primary); font-weight: 700; }
+  .pill-active {
+    background: var(--primary-bg); border-color: var(--primary); color: var(--primary); font-weight: 700;
+    animation: split-migrate 2.6s infinite ease-in-out;
+  }
+  .migrate-c { animation-delay: 0.5s; }
+  @keyframes hot-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 transparent; transform: scale(1); }
+    50% { box-shadow: 0 0 0 3px var(--red-bg); transform: scale(1.015); }
+  }
+  @keyframes split-cut {
+    0%, 100% { transform: translateX(0); box-shadow: 0 0 0 0 transparent; }
+    50% { transform: translateY(-1px); box-shadow: 0 2px 6px var(--amber-bg); }
+  }
+  @keyframes split-migrate {
+    0%, 100% { transform: translateX(0); box-shadow: 0 0 0 0 transparent; }
+    40% { transform: translateX(3px); box-shadow: 0 0 0 2px var(--primary-bg); }
+  }
   @media (max-width: 640px) {
     .diagram { padding: 8px; }
     .step-box { padding: 6px 8px; }
@@ -323,6 +386,11 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
     .key-bar { grid-template-columns: 1fr; gap: 2px; }
     .split-3-grid { grid-template-columns: 1fr 1fr; gap: 3px; }
     .idle-note { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .diagram *, .diagram *::before, .diagram *::after {
+      animation: none !important; transition: none !important;
+    }
   }
 </style>
 ```
@@ -382,17 +450,17 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
       </div>
       <div class="pk-desc">新しいキー値がキー空間全体にランダム（一様）に散らばります。分割されたすべてのスプリットへ同時に書き込みが振り分けられるため、サーバー台数に応じて書き込み性能がスケールします。</div>
       <div class="split-list">
-        <div class="sp-row sp-ok">
+        <div class="sp-row sp-ok sp-even-1">
           <span class="sp-name">Split 1 (Server A)</span>
           <span class="sp-range">Key: <code>[0000.., 5555..)</code> ⇐ <code>2a9f..</code></span>
           <span class="sp-load load-even">書込 約33%</span>
         </div>
-        <div class="sp-row sp-ok">
+        <div class="sp-row sp-ok sp-even-2">
           <span class="sp-name">Split 2 (Server B)</span>
           <span class="sp-range">Key: <code>[5555.., aaaa..)</code> ⇐ <code>7c1b..</code></span>
           <span class="sp-load load-even">書込 約33%</span>
         </div>
-        <div class="sp-row sp-ok">
+        <div class="sp-row sp-ok sp-even-3">
           <span class="sp-name">Split 3 (Server C)</span>
           <span class="sp-range">Key: <code>[aaaa.., ∞)</code> ⇐ <code>e402..</code></span>
           <span class="sp-load load-even">書込 約33%</span>
@@ -439,8 +507,17 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
     padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-sub);
   }
   .sp-cold { opacity: 0.75; }
-  .sp-hot { background: var(--red-bg); border-color: var(--red); }
-  .sp-ok { background: var(--surface); border-color: var(--green); }
+  .sp-hot {
+    background: var(--red-bg); border-color: var(--red);
+    animation: mono-hotspot 1.6s infinite ease-in-out;
+  }
+  .sp-ok {
+    background: var(--surface); border-color: var(--green);
+    animation: dist-write 2.4s infinite ease-in-out;
+  }
+  .sp-even-1 { animation-delay: 0s; }
+  .sp-even-2 { animation-delay: 0.8s; }
+  .sp-even-3 { animation-delay: 1.6s; }
   .sp-name { font-weight: 700; font-size: 12px; }
   .sp-range { font-size: 12px; color: var(--text-muted); }
   .sp-hot .sp-range { color: var(--red); font-weight: 600; }
@@ -448,12 +525,25 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   .load-zero { background: var(--surface); color: var(--text-muted); }
   .load-full { background: var(--surface); color: var(--red); border: 1px solid var(--red); }
   .load-even { background: var(--green-bg); color: var(--green); }
+  @keyframes mono-hotspot {
+    0%, 100% { box-shadow: 0 0 0 0 transparent; transform: scale(1); }
+    50% { box-shadow: 0 0 0 3px var(--red-bg); transform: scale(1.01); }
+  }
+  @keyframes dist-write {
+    0%, 100% { box-shadow: 0 0 0 0 transparent; }
+    35% { box-shadow: 0 0 0 2px var(--green-bg); background: var(--green-bg); }
+  }
   @media (max-width: 640px) {
     .diagram { padding: 8px; }
     .pk-grid { grid-template-columns: 1fr; gap: 8px; }
     .pk-card { padding: 8px 10px; }
     .pk-desc { margin-bottom: 6px; }
     .sp-row { padding: 4px 6px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .diagram *, .diagram *::before, .diagram *::after {
+      animation: none !important; transition: none !important;
+    }
   }
 </style>
 ```
