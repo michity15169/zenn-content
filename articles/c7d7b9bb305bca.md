@@ -230,9 +230,9 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
     <div class="tl-bar"><div class="tl-progress"></div></div>
     <div class="phase-banner">
       <div class="ph-text ph-1"><strong>Step 1 (初期状態):</strong> 1つのスプリット（<code>[1, 1000)</code>）に全データがあり、<code>Node 1</code> のみで処理しています。</div>
-      <div class="ph-text ph-2"><strong>Step 2 (アクセス集中):</strong> まだ1つのスプリットのまま、後半の <code>[500, 1000)</code> 付近にアクセスが集中して <code>Node 1</code> が高負荷になります。</div>
+      <div class="ph-text ph-2"><strong>Step 2 (アクセス集中):</strong> まだ1つのスプリットのまま負荷が高まり、<code>Split 1 [1, 1000)</code> 全体が高負荷（Hot）として検知されます。</div>
       <div class="ph-text ph-3"><strong>Step 3 (Split point追加で2分割):</strong> Spannerが境界（<code>500</code>）を1つ追加し、<code>[1, 500)</code> と <code>[500, 1000)</code> の2つへ分割します。</div>
-      <div class="ph-text ph-4"><strong>Step 4 (Node 2へ移動):</strong> 高負荷な <code>[500, 1000)</code> が <code>Node 2</code> へ移動し、<code>Node 1</code> の負荷が下がります。</div>
+      <div class="ph-text ph-4"><strong>Step 4 (Node 2へ移動):</strong> 片方の <code>[500, 1000)</code> が <code>Node 2</code> へ移動します（今回は後半にアクセスが偏っていたため <code>Node 2</code> 側が高負荷となります）。</div>
       <div class="ph-text ph-5"><strong>Step 5 (ノード追加と再度の2分割):</strong> <code>Node 3</code> が追加され、<code>Node 2</code> 上でさらに境界（<code>750</code>）を追加して2分割し、<code>[750, 1000)</code> を <code>Node 3</code> へ分散します。</div>
     </div>
   </div>
@@ -268,16 +268,11 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
         </div>
 
         <div class="lane-track">
-          <!-- Step 1〜2: まだ分割されていない単一スプリット [1, 1000) -->
+          <!-- Step 1〜2: まだ分割されていない単一スプリット [1, 1000) 全体 -->
           <div class="unified-bar">
             <div class="ub-single state-layer">
               <span class="st-item ph-1">Split 1: <code>[1, 1000)</code>（境界なし・単一スプリット）</span>
-            </div>
-            <div class="ub-hot-split">
-              <div class="ub-left state-layer"><span class="st-item ph-2"><code>[1, 500)</code></span></div>
-              <div class="ub-right state-layer">
-                <span class="st-item ph-2 ub-hot-lbl"><code>[500, 1000)</code> アクセス集中 (Hot)</span>
-              </div>
+              <span class="st-item ph-2 ub-hot-lbl">Split 1: <code>[1, 1000)</code>（高負荷 / Hot 検知）</span>
             </div>
           </div>
 
@@ -333,9 +328,9 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
           <div class="drop-spacer"></div>
           <div class="drop-slot drop-wide">
             <span class="state-layer">
-              <span class="st-item ph-1 hint-txt">待機中</span>
-              <span class="st-item ph-2 hint-txt">待機中</span>
-              <span class="st-item ph-3 hint-txt">受入準備</span>
+              <span class="st-item ph-1 hint-txt">待機中（余裕あり）</span>
+              <span class="st-item ph-2 hint-txt">待機中（余裕あり）</span>
+              <span class="st-item ph-3 hint-txt">待機中（余裕あり）</span>
             </span>
           </div>
         </div>
@@ -528,7 +523,6 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
 
   /* 自動再生 (25秒サイクル: P1 0-18%, P2 20-38%, P3 40-58%, P4 60-78%, P5 80-98%) */
   #sim-auto:checked ~ .matrix-wrap .unified-bar { animation: unibar-vis var(--cycle) infinite; }
-  #sim-auto:checked ~ .matrix-wrap .ub-right    { animation: ub-hot-bg var(--cycle) infinite; }
   #sim-auto:checked ~ .matrix-wrap .split-grid  { animation: slots-vis var(--cycle) infinite; }
   #sim-auto:checked ~ .matrix-wrap .sp-mid      { animation: move-mid var(--cycle) infinite; }
   #sim-auto:checked ~ .matrix-wrap .sp-right    { animation: move-right var(--cycle) infinite; }
@@ -542,8 +536,7 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   /* 手動フェーズ固定 */
   #sim-p1:checked ~ .matrix-wrap .split-grid,
   #sim-p2:checked ~ .matrix-wrap .split-grid { opacity: 0; pointer-events: none; }
-  #sim-p2:checked ~ .matrix-wrap .unified-bar { border-color: var(--red); }
-  #sim-p2:checked ~ .matrix-wrap .ub-right { background: var(--red-bg); }
+  #sim-p2:checked ~ .matrix-wrap .unified-bar { border-color: var(--red); background: var(--red-bg); }
   #sim-p2:checked ~ .matrix-wrap .fill-n1 { width: 95%; background: var(--red); }
   #sim-p2:checked ~ .matrix-wrap .lane-1 { border-color: var(--red); }
 
@@ -601,8 +594,12 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   @keyframes vis-p4 { 0%, 59% { opacity: 0; } 60%, 78% { opacity: 1; } 80%, 100% { opacity: 0; } }
   @keyframes vis-p5 { 0%, 79% { opacity: 0; } 80%, 98% { opacity: 1; } 100% { opacity: 0; } }
 
-  @keyframes unibar-vis { 0%, 38% { opacity: 1; } 40%, 98% { opacity: 0; } 100% { opacity: 1; } }
-  @keyframes ub-hot-bg { 0%, 18% { background: transparent; } 20%, 38% { background: var(--red-bg); } 40%, 100% { background: transparent; } }
+  @keyframes unibar-vis {
+    0%, 18% { opacity: 1; background: var(--n1-bg); border-color: var(--n1); }
+    20%, 38% { opacity: 1; background: var(--red-bg); border-color: var(--red); }
+    40%, 98% { opacity: 0; }
+    100% { opacity: 1; background: var(--n1-bg); border-color: var(--n1); }
+  }
   @keyframes slots-vis { 0%, 38% { opacity: 0; gap: 0px; } 42%, 98% { opacity: 1; gap: 6px; } 100% { opacity: 0; } }
 
   @keyframes move-mid {
@@ -686,7 +683,7 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
 </style>
 ```
 
-まずStep 1（初期状態）では、`Key: [1, 1000)`を受け持つ1つのスプリットに全データが格納され、Node 1の1台で処理されています。続くStep 2（アクセス集中）では、まだスプリットは1つのまま、`[500, 1000)`の範囲にアクセスが集中してNode 1のCPU使用率が急上昇します。Spanner内部では、単一サーバーのリソース制約に対してスプリットの負荷が50%を超えた状態を「Warm」、100%に達してリクエストのレイテンシに影響が出うる状態を「Hot（ホットスポット）」として検知します[^4]。
+まずStep 1（初期状態）では、`Key: [1, 1000)`を受け持つ1つのスプリットに全データが格納され、Node 1の1台で処理されています。続くStep 2（アクセス集中）では、まだスプリットは1つのままアクセス負荷が高まり、`Split 1 [1, 1000)`全体が高負荷状態として検知され、Node 1のCPU使用率が急上昇します。Spanner内部では、単一サーバーのリソース制約に対してスプリットの負荷が50%を超えた状態を「Warm」、100%に達してリクエストのレイテンシに影響が出うる状態を「Hot（ホットスポット）」として検知します[^4]。
 
 続いてStep 3では、Spannerがバックグラウンドでスプリット境界（`500`）を追加し、`[1, 500)`と`[500, 1000)`の2つへ分割します[^1][^4]。Step 4では、高負荷な`[500, 1000)`をインスタンス内の余裕があるNode 2へ移動させることで、Node 1の負荷が一気に解消されます。
 
