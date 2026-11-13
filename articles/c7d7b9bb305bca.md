@@ -223,29 +223,28 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
       <label for="sim-auto" class="sim-tab tab-auto">自動再生 (25秒)</label>
       <label for="sim-p1" class="sim-tab tab-p1">1. 初期</label>
       <label for="sim-p2" class="sim-tab tab-p2">2. 負荷集中</label>
-      <label for="sim-p3" class="sim-tab tab-p3">3. 境界・分割</label>
+      <label for="sim-p3" class="sim-tab tab-p3">3. 2分割 (500)</label>
       <label for="sim-p4" class="sim-tab tab-p4">4. Node 2へ移動</label>
-      <label for="sim-p5" class="sim-tab tab-p5">5. Node 3追加</label>
+      <label for="sim-p5" class="sim-tab tab-p5">5. 再分割・Node 3追加</label>
     </div>
     <div class="tl-bar"><div class="tl-progress"></div></div>
     <div class="phase-banner">
-      <div class="ph-text ph-1"><strong>Step 1 (初期状態):</strong> 境界のない1つの <code>Split 1 [1, 1000)</code> に全データがあり、<code>Node 1</code> のみで処理しています。</div>
-      <div class="ph-text ph-2"><strong>Step 2 (アクセス集中・Hot検知):</strong> 1つのスプリットのまま、中央の <code>[400, 600)</code> に負荷が集中し <code>Node 1</code> が高負荷になります。</div>
-      <div class="ph-text ph-3"><strong>Step 3 (境界追加・分割):</strong> ホットな <code>[400, 600)</code> を切り出して並列化するため、<code>400, 500, 600</code> に境界を追加し4分割します。</div>
-      <div class="ph-text ph-4"><strong>Step 4 (Node 2へ移動):</strong> 切り出した <code>1b</code> が余裕のある <code>Node 2</code> へ移動し、負荷が2台のノードに分かれます。</div>
-      <div class="ph-text ph-5"><strong>Step 5 (ノード追加・再分散):</strong> スケールアウトで <code>Node 3</code> が追加され、<code>1c</code> が移動して全3台へ均等に負荷が分散されます。</div>
+      <div class="ph-text ph-1"><strong>Step 1 (初期状態):</strong> 1つのスプリット（<code>[1, 1000)</code>）に全データがあり、<code>Node 1</code> のみで処理しています。</div>
+      <div class="ph-text ph-2"><strong>Step 2 (アクセス集中):</strong> まだ1つのスプリットのまま、後半の <code>[500, 1000)</code> 付近にアクセスが集中して <code>Node 1</code> が高負荷になります。</div>
+      <div class="ph-text ph-3"><strong>Step 3 (Split point追加で2分割):</strong> Spannerが境界（<code>500</code>）を1つ追加し、<code>[1, 500)</code> と <code>[500, 1000)</code> の2つへ分割します。</div>
+      <div class="ph-text ph-4"><strong>Step 4 (Node 2へ移動):</strong> 高負荷な <code>[500, 1000)</code> が <code>Node 2</code> へ移動し、<code>Node 1</code> の負荷が下がります。</div>
+      <div class="ph-text ph-5"><strong>Step 5 (ノード追加と再度の2分割):</strong> <code>Node 3</code> が追加され、<code>Node 2</code> 上でさらに境界（<code>750</code>）を追加して2分割し、<code>[750, 1000)</code> を <code>Node 3</code> へ分散します。</div>
     </div>
   </div>
 
   <!-- 2次元マトリクス: 横軸=キー空間 / 縦軸=ノードレーン -->
   <div class="matrix-wrap">
     <div class="matrix-head">
-      <div class="mh-node">ノード / CPU負荷</div>
+      <div class="mh-node">ノード / CPU使用率</div>
       <div class="mh-keys">
-        <span><code>[1, 400)</code></span>
-        <span><code>[400, 500)</code></span>
-        <span><code>[500, 600)</code></span>
-        <span><code>[600, 1000)</code></span>
+        <span><code>[1, 500)</code></span>
+        <span><code>[500, 750)</code></span>
+        <span><code>[750, 1000)</code></span>
       </div>
     </div>
 
@@ -256,52 +255,54 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
           <div class="li-top">
             <span class="li-name">Node 1</span>
             <span class="state-layer">
-              <span class="st-item ph-1 badge-n1">25%</span>
-              <span class="st-item ph-2 badge-hot">95% Hot</span>
-              <span class="st-item ph-3 badge-hot">92% 分割</span>
-              <span class="st-item ph-4 badge-warn">58%</span>
-              <span class="st-item ph-5 badge-ok">32%</span>
+              <span class="st-item ph-1 badge-n1">CPU 20%</span>
+              <span class="st-item ph-2 badge-hot">CPU 95%</span>
+              <span class="st-item ph-3 badge-hot">CPU 92%</span>
+              <span class="st-item ph-4 badge-ok">CPU 20%</span>
+              <span class="st-item ph-5 badge-ok">CPU 20%</span>
             </span>
           </div>
-          <div class="cpu-bar"><div class="cpu-fill fill-n1"></div></div>
+          <div class="cpu-meter" aria-label="Node 1 CPU使用率">
+            <div class="cpu-fill fill-n1"></div>
+          </div>
         </div>
 
         <div class="lane-track">
-          <!-- Step 1〜2: まだ分割されていない単一 Split 1（Step 2 では中央 [400,600) だけ発熱） -->
+          <!-- Step 1〜2: まだ分割されていない単一スプリット [1, 1000) -->
           <div class="unified-bar">
-            <div class="ub-side"><code>[1, 400)</code></div>
-            <div class="ub-center state-layer">
-              <span class="st-item ph-1">Split 1: <code>[1, 1000)</code>（単一スプリット）</span>
-              <span class="st-item ph-2 ub-hot-lbl"><code>[400, 600)</code> アクセス集中 (Hot)</span>
+            <div class="ub-left"><code>[1, 500)</code></div>
+            <div class="ub-right state-layer">
+              <span class="st-item ph-1"><code>[1, 1000)</code>（単一スプリット）</span>
+              <span class="st-item ph-2 ub-hot-lbl"><code>[500, 1000)</code> アクセス集中</span>
             </div>
-            <div class="ub-side"><code>[600, 1000)</code></div>
           </div>
 
-          <!-- Step 3〜5: 境界が追加されて4分割されたスプリット（1b, 1c が下のノードへ移動） -->
-          <div class="split-slots">
-            <div class="sp-block sp-1a">
-              <span class="sp-id">1a</span>
-              <span class="sp-sub"><code>[1,400)</code></span>
+          <!-- Step 3〜5: まず 500 で2分割 → 後半 [500,1000) が Node 2 へ移動し、Step 5 でさらに 750 で2分割 -->
+          <div class="split-grid">
+            <!-- 左半分 [1, 500): ずっと Node 1 に留まる -->
+            <div class="sp-block sp-left">
+              <span class="sp-id"><code>[1, 500)</code></span>
+              <span class="sp-sub">Node 1 担当</span>
             </div>
-            <div class="sp-block sp-1b">
-              <span class="sp-id">1b</span>
+
+            <!-- 右半分の前半 [500, 750): Step 3 では [500,1000) の一部として一体表示、Step 4 で Node 2 へ、Step 5 で独立 -->
+            <div class="sp-block sp-mid">
+              <span class="sp-id state-layer">
+                <span class="st-item ph-3"><code>[500, 1000)</code></span>
+                <span class="st-item ph-4"><code>[500, 1000)</code></span>
+                <span class="st-item ph-5"><code>[500, 750)</code></span>
+              </span>
               <span class="sp-sub state-layer">
-                <span class="st-item ph-3">切り出し</span>
-                <span class="st-item ph-4">Node 2へ</span>
-                <span class="st-item ph-5">Node 2</span>
+                <span class="st-item ph-3">分割された高負荷範囲</span>
+                <span class="st-item ph-4">Node 2 へ移動</span>
+                <span class="st-item ph-5">Node 2 担当</span>
               </span>
             </div>
-            <div class="sp-block sp-1c">
-              <span class="sp-id">1c</span>
-              <span class="sp-sub state-layer">
-                <span class="st-item ph-3">切り出し</span>
-                <span class="st-item ph-4">残存</span>
-                <span class="st-item ph-5">Node 3へ</span>
-              </span>
-            </div>
-            <div class="sp-block sp-1d">
-              <span class="sp-id">1d</span>
-              <span class="sp-sub"><code>[600,1000)</code></span>
+
+            <!-- 右半分の後半 [750, 1000): Step 3〜4 は sp-mid と一体化、Step 5 で境界750が入り Node 3 へ移動 -->
+            <div class="sp-block sp-right">
+              <span class="sp-id"><code>[750, 1000)</code></span>
+              <span class="sp-sub">Node 3 へ移動</span>
             </div>
           </div>
         </div>
@@ -313,26 +314,26 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
           <div class="li-top">
             <span class="li-name">Node 2</span>
             <span class="state-layer">
-              <span class="st-item ph-1 badge-muted">10%</span>
-              <span class="st-item ph-2 badge-muted">10%</span>
-              <span class="st-item ph-3 badge-muted">10%</span>
-              <span class="st-item ph-4 badge-n2">52%</span>
-              <span class="st-item ph-5 badge-ok">34%</span>
+              <span class="st-item ph-1 badge-muted">CPU 10%</span>
+              <span class="st-item ph-2 badge-muted">CPU 10%</span>
+              <span class="st-item ph-3 badge-muted">CPU 10%</span>
+              <span class="st-item ph-4 badge-hot">CPU 85%</span>
+              <span class="st-item ph-5 badge-n2">CPU 42%</span>
             </span>
           </div>
-          <div class="cpu-bar"><div class="cpu-fill fill-n2"></div></div>
+          <div class="cpu-meter" aria-label="Node 2 CPU使用率">
+            <div class="cpu-fill fill-n2"></div>
+          </div>
         </div>
         <div class="lane-track track-drop">
           <div class="drop-slot"></div>
-          <div class="drop-slot slot-1b">
+          <div class="drop-slot drop-wide">
             <span class="state-layer">
               <span class="st-item ph-1 hint-txt">待機中</span>
               <span class="st-item ph-2 hint-txt">待機中</span>
               <span class="st-item ph-3 hint-txt">受入準備</span>
             </span>
           </div>
-          <div class="drop-slot"></div>
-          <div class="drop-slot"></div>
         </div>
       </div>
 
@@ -341,15 +342,16 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
         <div class="lane-info">
           <div class="li-top">
             <span class="li-name">Node 3 (追加)</span>
-            <span class="badge-ok">34%</span>
+            <span class="badge-ok">CPU 43%</span>
           </div>
-          <div class="cpu-bar"><div class="cpu-fill fill-n3"></div></div>
+          <div class="cpu-meter" aria-label="Node 3 CPU使用率">
+            <div class="cpu-fill fill-n3"></div>
+          </div>
         </div>
-        <div class="lane-track track-drop">
+        <div class="lane-track track-drop-3">
           <div class="drop-slot"></div>
           <div class="drop-slot"></div>
-          <div class="drop-slot slot-1c"></div>
-          <div class="drop-slot"></div>
+          <div class="drop-slot slot-n3"></div>
         </div>
       </div>
     </div>
@@ -360,6 +362,7 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   .diagram {
     --bg: #f8fafc; --surface: #ffffff; --surface-sub: #f1f5f9;
     --text: #0f172a; --text-muted: #475569; --border: #cbd5e1;
+    --meter-bg: #e2e8f0;
     --n1: #0284c7; --n1-bg: #e0f2fe;
     --n2: #7c3aed; --n2-bg: #ede9fe;
     --n3: #15803d; --n3-bg: #dcfce7;
@@ -377,6 +380,7 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   [data-theme="dark"] .diagram {
     --bg: #0f172a; --surface: #1e293b; --surface-sub: #162032;
     --text: #f1f5f9; --text-muted: #94a3b8; --border: #334155;
+    --meter-bg: #0f172a;
     --n1: #38bdf8; --n1-bg: #0c4a6e;
     --n2: #a78bfa; --n2-bg: #3b0764;
     --n3: #4ade80; --n3-bg: #064e3b;
@@ -433,15 +437,15 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
     padding: 8px 10px;
   }
   .matrix-head {
-    display: grid; grid-template-columns: 145px 1fr; gap: 8px;
+    display: grid; grid-template-columns: 155px 1fr; gap: 8px;
     padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid var(--border);
     font-size: 12px; font-weight: 700; color: var(--text-muted);
   }
-  .mh-keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center; }
+  .mh-keys { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 6px; text-align: center; }
 
   .lanes { display: flex; flex-direction: column; gap: var(--row-gap); }
   .lane-row {
-    display: grid; grid-template-columns: 145px 1fr; gap: 8px; align-items: center;
+    display: grid; grid-template-columns: 155px 1fr; gap: 8px; align-items: center;
     height: var(--row-h); padding: 6px 8px; border-radius: 8px;
     background: var(--surface-sub); border: 1.5px solid var(--border);
     position: relative;
@@ -457,34 +461,43 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   .lane-info { display: flex; flex-direction: column; gap: 5px; }
   .li-top { display: flex; justify-content: space-between; align-items: center; gap: 4px; }
   .li-name { font-weight: 700; font-size: 12px; white-space: nowrap; }
-  .cpu-bar { width: 100%; height: 7px; background: var(--surface); border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
-  .cpu-fill { height: 100%; border-radius: 3px; width: 25%; background: var(--n1); transition: width 0.5s ease, background 0.5s ease; }
+  .cpu-meter {
+    width: 100%; height: 10px; background: var(--meter-bg); border-radius: 5px;
+    overflow: hidden; border: 1px solid var(--border);
+  }
+  .cpu-fill { height: 100%; border-radius: 4px; width: 20%; background: var(--n1); transition: width 0.5s ease, background 0.5s ease; }
   .fill-n2 { width: 10%; background: var(--text-muted); }
-  .fill-n3 { width: 34%; background: var(--n3); }
+  .fill-n3 { width: 43%; background: var(--n3); }
 
-  .badge-n1, .badge-n2, .badge-hot, .badge-warn, .badge-ok, .badge-muted {
+  .badge-n1, .badge-n2, .badge-hot, .badge-ok, .badge-muted {
     display: inline-block; padding: 1px 5px; border-radius: 4px; font-size: 12px; font-weight: 700; text-align: right; white-space: nowrap;
   }
   .badge-n1 { background: var(--n1-bg); color: var(--n1); }
   .badge-n2 { background: var(--n2-bg); color: var(--n2); }
   .badge-ok { background: var(--n3-bg); color: var(--n3); }
   .badge-hot { background: var(--red-bg); color: var(--red); }
-  .badge-warn { background: var(--amber-bg); color: var(--amber); }
   .badge-muted { background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); }
 
   .lane-track { position: relative; height: 48px; display: grid; }
   .unified-bar {
     grid-area: 1 / 1; z-index: 3;
     background: var(--n1-bg); border: 2px solid var(--n1); border-radius: 6px;
-    display: grid; grid-template-columns: 1fr 2fr 1fr; align-items: stretch; overflow: hidden;
+    display: grid; grid-template-columns: 1fr 1fr; align-items: stretch; overflow: hidden;
     font-weight: 700; font-size: 12px; color: var(--n1);
   }
-  .ub-side { display: flex; align-items: center; justify-content: center; opacity: 0.7; }
-  .ub-center { display: grid; align-items: center; text-align: center; padding: 0 4px; }
+  .ub-left { display: flex; align-items: center; justify-content: center; opacity: 0.75; }
+  .ub-right { display: grid; align-items: center; text-align: center; padding: 0 4px; }
   .ub-hot-lbl { color: var(--red); }
 
-  .split-slots, .track-drop {
-    grid-area: 1 / 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; height: 100%;
+  /* スプリットトラック: [1,500) が 2fr、[500,750) が 1fr、[750,1000) が 1fr */
+  .split-grid {
+    grid-area: 1 / 1; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 6px; height: 100%;
+  }
+  .track-drop {
+    grid-area: 1 / 1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; height: 100%;
+  }
+  .track-drop-3 {
+    grid-area: 1 / 1; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 6px; height: 100%;
   }
   .sp-block {
     border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -492,8 +505,13 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
     font-weight: 700; position: relative; z-index: 5;
     transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1), background 0.4s ease, border-color 0.4s ease, color 0.4s ease;
   }
-  .sp-id { font-size: 12px; font-weight: 700; line-height: 1.1; }
-  .sp-sub { font-size: 12px; font-weight: 600; line-height: 1.1; }
+  /* Step 3〜4では sp-mid が右2列分(2 / 4)を統合して [500, 1000) として振る舞う */
+  .sp-left { grid-column: 1 / 2; grid-row: 1; }
+  .sp-mid { grid-column: 2 / 4; grid-row: 1; }
+  .sp-right { grid-column: 3 / 4; grid-row: 1; opacity: 0; pointer-events: none; z-index: 6; }
+
+  .sp-id { font-size: 12px; font-weight: 700; line-height: 1.15; }
+  .sp-sub { font-size: 12px; font-weight: 600; line-height: 1.15; }
 
   .drop-slot {
     border-radius: 6px; border: 1px dashed var(--border); background: var(--surface);
@@ -503,21 +521,21 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
 
   /* 自動再生 (25秒サイクル: P1 0-18%, P2 20-38%, P3 40-58%, P4 60-78%, P5 80-98%) */
   #sim-auto:checked ~ .matrix-wrap .unified-bar { animation: unibar-vis var(--cycle) infinite; }
-  #sim-auto:checked ~ .matrix-wrap .ub-center   { animation: ub-hot-bg var(--cycle) infinite; }
-  #sim-auto:checked ~ .matrix-wrap .split-slots { animation: slots-vis var(--cycle) infinite; }
-  #sim-auto:checked ~ .matrix-wrap .sp-1b { animation: move-1b var(--cycle) infinite; }
-  #sim-auto:checked ~ .matrix-wrap .sp-1c { animation: move-1c var(--cycle) infinite; }
-  #sim-auto:checked ~ .matrix-wrap .lane-1 { animation: l1-box var(--cycle) infinite; }
-  #sim-auto:checked ~ .matrix-wrap .lane-2 { animation: l2-box var(--cycle) infinite; }
-  #sim-auto:checked ~ .matrix-wrap .lane-3 { animation: l3-add var(--cycle) infinite; }
-  #sim-auto:checked ~ .matrix-wrap .fill-n1 { animation: cpu-n1 var(--cycle) infinite; }
-  #sim-auto:checked ~ .matrix-wrap .fill-n2 { animation: cpu-n2 var(--cycle) infinite; }
+  #sim-auto:checked ~ .matrix-wrap .ub-right    { animation: ub-hot-bg var(--cycle) infinite; }
+  #sim-auto:checked ~ .matrix-wrap .split-grid  { animation: slots-vis var(--cycle) infinite; }
+  #sim-auto:checked ~ .matrix-wrap .sp-mid      { animation: move-mid var(--cycle) infinite; }
+  #sim-auto:checked ~ .matrix-wrap .sp-right    { animation: move-right var(--cycle) infinite; }
+  #sim-auto:checked ~ .matrix-wrap .lane-1      { animation: l1-box var(--cycle) infinite; }
+  #sim-auto:checked ~ .matrix-wrap .lane-2      { animation: l2-box var(--cycle) infinite; }
+  #sim-auto:checked ~ .matrix-wrap .lane-3      { animation: l3-add var(--cycle) infinite; }
+  #sim-auto:checked ~ .matrix-wrap .fill-n1     { animation: cpu-n1 var(--cycle) infinite; }
+  #sim-auto:checked ~ .matrix-wrap .fill-n2     { animation: cpu-n2 var(--cycle) infinite; }
 
   /* 手動フェーズ固定 */
-  #sim-p1:checked ~ .matrix-wrap .split-slots,
-  #sim-p2:checked ~ .matrix-wrap .split-slots { opacity: 0; pointer-events: none; }
+  #sim-p1:checked ~ .matrix-wrap .split-grid,
+  #sim-p2:checked ~ .matrix-wrap .split-grid { opacity: 0; pointer-events: none; }
   #sim-p2:checked ~ .matrix-wrap .unified-bar { border-color: var(--red); }
-  #sim-p2:checked ~ .matrix-wrap .ub-center { background: var(--red-bg); }
+  #sim-p2:checked ~ .matrix-wrap .ub-right { background: var(--red-bg); }
   #sim-p2:checked ~ .matrix-wrap .fill-n1 { width: 95%; background: var(--red); }
   #sim-p2:checked ~ .matrix-wrap .lane-1 { border-color: var(--red); }
 
@@ -525,31 +543,31 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   #sim-p4:checked ~ .matrix-wrap .unified-bar,
   #sim-p5:checked ~ .matrix-wrap .unified-bar { opacity: 0; pointer-events: none; }
 
-  #sim-p3:checked ~ .matrix-wrap .sp-1b,
-  #sim-p3:checked ~ .matrix-wrap .sp-1c { background: var(--red-bg); border: 1.5px dashed var(--red); color: var(--red); }
+  #sim-p3:checked ~ .matrix-wrap .sp-mid { background: var(--red-bg); border: 1.5px dashed var(--red); color: var(--red); }
   #sim-p3:checked ~ .matrix-wrap .fill-n1 { width: 92%; background: var(--red); }
   #sim-p3:checked ~ .matrix-wrap .lane-1 { border-color: var(--amber); }
 
-  #sim-p4:checked ~ .matrix-wrap .sp-1b {
+  #sim-p4:checked ~ .matrix-wrap .sp-mid {
     transform: translateY(var(--step-y));
-    background: var(--n2-bg); border-color: var(--n2); color: var(--n2);
+    background: var(--red-bg); border: 1.5px dashed var(--red); color: var(--red);
   }
-  #sim-p4:checked ~ .matrix-wrap .sp-1c { background: var(--amber-bg); border: 1.5px dashed var(--amber); color: var(--amber); }
-  #sim-p4:checked ~ .matrix-wrap .fill-n1 { width: 58%; background: var(--amber); }
-  #sim-p4:checked ~ .matrix-wrap .fill-n2 { width: 52%; background: var(--n2); }
-  #sim-p4:checked ~ .matrix-wrap .lane-1 { border-color: var(--amber); }
-  #sim-p4:checked ~ .matrix-wrap .lane-2 { border-color: var(--n2); }
+  #sim-p4:checked ~ .matrix-wrap .fill-n1 { width: 20%; background: var(--n3); }
+  #sim-p4:checked ~ .matrix-wrap .fill-n2 { width: 85%; background: var(--red); }
+  #sim-p4:checked ~ .matrix-wrap .lane-1 { border-color: var(--n3); }
+  #sim-p4:checked ~ .matrix-wrap .lane-2 { border-color: var(--red); }
 
-  #sim-p5:checked ~ .matrix-wrap .sp-1b {
+  #sim-p5:checked ~ .matrix-wrap .sp-mid {
+    grid-column: 2 / 3;
     transform: translateY(var(--step-y));
     background: var(--n2-bg); border-color: var(--n2); color: var(--n2);
   }
-  #sim-p5:checked ~ .matrix-wrap .sp-1c {
+  #sim-p5:checked ~ .matrix-wrap .sp-right {
+    opacity: 1;
     transform: translateY(calc(2 * var(--step-y)));
     background: var(--n3-bg); border-color: var(--n3); color: var(--n3);
   }
-  #sim-p5:checked ~ .matrix-wrap .fill-n1 { width: 32%; background: var(--n3); }
-  #sim-p5:checked ~ .matrix-wrap .fill-n2 { width: 34%; background: var(--n2); }
+  #sim-p5:checked ~ .matrix-wrap .fill-n1 { width: 20%; background: var(--n3); }
+  #sim-p5:checked ~ .matrix-wrap .fill-n2 { width: 42%; background: var(--n2); }
   #sim-p5:checked ~ .matrix-wrap .lane-1 { border-color: var(--n3); }
   #sim-p5:checked ~ .matrix-wrap .lane-2 { border-color: var(--n2); }
   #sim-p5:checked ~ .matrix-wrap .lane-3 {
@@ -574,63 +592,50 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   @keyframes vis-p4 { 0%, 59% { opacity: 0; } 60%, 78% { opacity: 1; } 80%, 100% { opacity: 0; } }
   @keyframes vis-p5 { 0%, 79% { opacity: 0; } 80%, 98% { opacity: 1; } 100% { opacity: 0; } }
 
-  @keyframes unibar-vis {
-    0%, 38% { opacity: 1; }
-    40%, 98% { opacity: 0; }
-    100% { opacity: 1; }
-  }
-  @keyframes ub-hot-bg {
-    0%, 18% { background: transparent; }
-    20%, 38% { background: var(--red-bg); }
-    40%, 100% { background: transparent; }
-  }
-  @keyframes slots-vis {
-    0%, 38% { opacity: 0; gap: 0px; }
-    42%, 98% { opacity: 1; gap: 6px; }
-    100% { opacity: 0; }
-  }
+  @keyframes unibar-vis { 0%, 38% { opacity: 1; } 40%, 98% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes ub-hot-bg { 0%, 18% { background: transparent; } 20%, 38% { background: var(--red-bg); } 40%, 100% { background: transparent; } }
+  @keyframes slots-vis { 0%, 38% { opacity: 0; gap: 0px; } 42%, 98% { opacity: 1; gap: 6px; } 100% { opacity: 0; } }
 
-  @keyframes move-1b {
-    0%, 38% { transform: translateY(0); background: var(--n1-bg); border-color: var(--n1); color: var(--n1); }
-    40%, 59% { transform: translateY(0); background: var(--red-bg); border: 1.5px dashed var(--red); color: var(--red); }
-    67%, 98% { transform: translateY(var(--step-y)); background: var(--n2-bg); border: 1.5px solid var(--n2); color: var(--n2); }
-    100% { transform: translateY(0); background: var(--n1-bg); border-color: var(--n1); color: var(--n1); }
+  @keyframes move-mid {
+    0%, 38% { grid-column: 2 / 4; transform: translateY(0); background: var(--n1-bg); border-color: var(--n1); color: var(--n1); }
+    40%, 59% { grid-column: 2 / 4; transform: translateY(0); background: var(--red-bg); border: 1.5px dashed var(--red); color: var(--red); }
+    67%, 78% { grid-column: 2 / 4; transform: translateY(var(--step-y)); background: var(--red-bg); border: 1.5px dashed var(--red); color: var(--red); }
+    80%, 98% { grid-column: 2 / 3; transform: translateY(var(--step-y)); background: var(--n2-bg); border: 1.5px solid var(--n2); color: var(--n2); }
+    100% { grid-column: 2 / 4; transform: translateY(0); background: var(--n1-bg); border-color: var(--n1); color: var(--n1); }
   }
-  @keyframes move-1c {
-    0%, 38% { transform: translateY(0); background: var(--n1-bg); border-color: var(--n1); color: var(--n1); }
-    40%, 59% { transform: translateY(0); background: var(--red-bg); border: 1.5px dashed var(--red); color: var(--red); }
-    61%, 80% { transform: translateY(0); background: var(--amber-bg); border: 1.5px dashed var(--amber); color: var(--amber); }
-    87%, 98% { transform: translateY(calc(2 * var(--step-y))); background: var(--n3-bg); border: 1.5px solid var(--n3); color: var(--n3); }
-    100% { transform: translateY(0); background: var(--n1-bg); border-color: var(--n1); color: var(--n1); }
+  @keyframes move-right {
+    0%, 78% { opacity: 0; transform: translateY(var(--step-y)); background: var(--red-bg); border: 1.5px dashed var(--red); color: var(--red); }
+    80% { opacity: 1; transform: translateY(var(--step-y)); background: var(--amber-bg); border: 1.5px dashed var(--amber); color: var(--amber); }
+    87%, 98% { opacity: 1; transform: translateY(calc(2 * var(--step-y))); background: var(--n3-bg); border: 1.5px solid var(--n3); color: var(--n3); }
+    100% { opacity: 0; transform: translateY(var(--step-y)); }
   }
   @keyframes l1-box {
     0%, 18% { border-color: var(--n1); }
     20%, 58% { border-color: var(--red); }
-    60%, 78% { border-color: var(--amber); }
-    80%, 98% { border-color: var(--n3); }
+    60%, 98% { border-color: var(--n3); }
     100% { border-color: var(--n1); }
   }
   @keyframes l2-box {
     0%, 60% { border-color: var(--border); }
-    64%, 98% { border-color: var(--n2); }
+    66%, 78% { border-color: var(--red); }
+    82%, 98% { border-color: var(--n2); }
     100% { border-color: var(--border); }
   }
   @keyframes l3-add {
-    0%, 79% { height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-width: 0; margin-top: calc(-1 * var(--row-gap)); }
+    0%, 78% { height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-width: 0; margin-top: calc(-1 * var(--row-gap)); }
     83%, 98% { height: var(--row-h); opacity: 1; padding-top: 6px; padding-bottom: 6px; border-width: 1.5px; margin-top: 0; }
     100% { height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-width: 0; margin-top: calc(-1 * var(--row-gap)); }
   }
   @keyframes cpu-n1 {
-    0%, 18% { width: 25%; background: var(--n1); }
+    0%, 18% { width: 20%; background: var(--n1); }
     20%, 58% { width: 95%; background: var(--red); }
-    64%, 79% { width: 58%; background: var(--amber); }
-    85%, 98% { width: 32%; background: var(--n3); }
-    100% { width: 25%; background: var(--n1); }
+    66%, 98% { width: 20%; background: var(--n3); }
+    100% { width: 20%; background: var(--n1); }
   }
   @keyframes cpu-n2 {
     0%, 60% { width: 10%; background: var(--text-muted); }
-    66%, 79% { width: 52%; background: var(--n2); }
-    85%, 98% { width: 34%; background: var(--n2); }
+    66%, 78% { width: 85%; background: var(--red); }
+    85%, 98% { width: 42%; background: var(--n2); }
     100% { width: 10%; background: var(--text-muted); }
   }
 
@@ -648,30 +653,30 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
     .lane-row { grid-template-columns: 1fr; gap: 4px; padding: 5px 6px; }
     .lane-info { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }
     .li-top { gap: 6px; }
-    .cpu-bar { width: 70px; flex-shrink: 0; }
+    .cpu-meter { width: 76px; flex-shrink: 0; }
     .lane-track { height: 44px; }
-    .ub-side { display: none; }
+    .ub-left { display: none; }
     .unified-bar { grid-template-columns: 1fr; }
-    .split-slots, .track-drop { gap: 3px; }
+    .split-grid, .track-drop, .track-drop-3 { gap: 3px; }
     .sp-sub { display: none; }
   }
   @media (prefers-reduced-motion: reduce) {
     .diagram *, .diagram *::before, .diagram *::after { animation: none !important; transition: none !important; }
     #sim-auto:checked ~ * .ph-5 { opacity: 1; }
     #sim-auto:checked ~ .matrix-wrap .unified-bar { opacity: 0; }
-    #sim-auto:checked ~ .matrix-wrap .split-slots { opacity: 1; }
+    #sim-auto:checked ~ .matrix-wrap .split-grid { opacity: 1; }
     #sim-auto:checked ~ .matrix-wrap .lane-3 { height: var(--row-h); opacity: 1; padding: 6px 8px; border-width: 1.5px; margin-top: 0; }
-    #sim-auto:checked ~ .matrix-wrap .sp-1b { transform: translateY(var(--step-y)); background: var(--n2-bg); border-color: var(--n2); color: var(--n2); }
-    #sim-auto:checked ~ .matrix-wrap .sp-1c { transform: translateY(calc(2 * var(--step-y))); background: var(--n3-bg); border-color: var(--n3); color: var(--n3); }
+    #sim-auto:checked ~ .matrix-wrap .sp-mid { grid-column: 2 / 3; transform: translateY(var(--step-y)); background: var(--n2-bg); border-color: var(--n2); color: var(--n2); }
+    #sim-auto:checked ~ .matrix-wrap .sp-right { opacity: 1; transform: translateY(calc(2 * var(--step-y))); background: var(--n3-bg); border-color: var(--n3); color: var(--n3); }
   }
 </style>
 ```
 
-まずStep 1（初期状態）では、`Key: [1, 1000)`を受け持つ1つのスプリット（Split 1）に全データが格納され、Node 1の1台で処理されています。続くStep 2（アクセス集中・Hot検知）では、まだスプリットは1つのまま、`[400, 600)`の範囲にアクセスが集中してNode 1のCPU使用率が急上昇します。Spanner内部では、単一サーバーのリソース制約に対してスプリットの負荷が50%を超えた状態を「Warm」、100%に達してリクエストのレイテンシに影響が出うる状態を「Hot（ホットスポット）」として検知します[^4]。
+まずStep 1（初期状態）では、`Key: [1, 1000)`を受け持つ1つのスプリットに全データが格納され、Node 1の1台で処理されています。続くStep 2（アクセス集中）では、まだスプリットは1つのまま、`[500, 1000)`の範囲にアクセスが集中してNode 1のCPU使用率が急上昇します。Spanner内部では、単一サーバーのリソース制約に対してスプリットの負荷が50%を超えた状態を「Warm」、100%に達してリクエストのレイテンシに影響が出うる状態を「Hot（ホットスポット）」として検知します[^4]。
 
-続いてStep 3（境界追加・分割）では、Spannerがバックグラウンドで負荷の高い`[400, 600)`の領域を切り離して並列処理できるように、その前後（`400`、`600`）と内部（`500`）へ新しいスプリット境界を追加し、`Split 1a`〜`1d`の4つへと分割します[^1][^4]。このとき、最小で1行単位までスプリットの境界を狭めることができます[^1]。
+続いてStep 3では、Spannerがバックグラウンドでスプリット境界（`500`）を追加し、`[1, 500)`と`[500, 1000)`の2つへ分割します[^1][^4]。Step 4では、高負荷な`[500, 1000)`をインスタンス内の余裕があるNode 2へ移動させることで、Node 1の負荷が一気に解消されます。
 
-Step 4（Node 2へ移動）では、切り出された`1b`をインスタンス内の余裕があるNode 2へ移動させます。さらにトラフィックが増加してノードが追加（スケールアウト）されたStep 5では、新しく追加されたNode 3へ`1c`が再配置されます。このように、当初は1つのスプリット・1台のノードだけで受けていた集中アクセスが、スプリット分割と移動によって複数のノードで並列に処理されるようになり、段階的に各ノードの負荷が下がってスループットが向上していきます[^1]。反対に、アクセスが落ち着いて負荷の低い状態が続いたスプリット同士は、再び自動的に統合（マージ）されます[^3]。
+さらにトラフィックが増加してNode 3が追加（スケールアウト）されたStep 5では、まだ高負荷な`[500, 1000)`に対してNode 2上で再び境界（`750`）を追加して2分割し、片方の`[750, 1000)`を新しく追加されたNode 3へ再配置します。このように、Spannerは負荷に応じて「境界を追加して分割し、別ノードへ逃がす」という処理を数分おきに段階的に繰り返すことで、各ノードの負荷を平準化してスループットを向上させていきます[^1]。なお、アクセスが集中しているキーが少数行に限られる場合は、最小で1行単位までスプリットの境界を狭めることも可能です[^1]。反対に、アクセスが落ち着いて負荷の低い状態が続いたスプリット同士は、再び自動的に統合（マージ）されます[^3]。
 
 ### 自動分割にかかる時間と事前分割（Pre-splitting）
 
