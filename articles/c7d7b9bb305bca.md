@@ -219,124 +219,125 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
 
   <div class="sim-toolbar">
     <div class="sim-tabs">
-      <label for="sim-auto" class="sim-tab tab-auto">自動再生 (ループ)</label>
+      <label for="sim-auto" class="sim-tab tab-auto">自動再生 (20秒)</label>
       <label for="sim-p1" class="sim-tab tab-p1">1. 初期状態</label>
-      <label for="sim-p2" class="sim-tab tab-p2">2. 負荷集中・境界追加</label>
-      <label for="sim-p3" class="sim-tab tab-p3">3. 分割・Node 2へ移動</label>
-      <label for="sim-p4" class="sim-tab tab-p4">4. Node 3追加・再分散</label>
+      <label for="sim-p2" class="sim-tab tab-p2">2. 負荷集中・分割</label>
+      <label for="sim-p3" class="sim-tab tab-p3">3. Node 2へ移動</label>
+      <label for="sim-p4" class="sim-tab tab-p4">4. Node 3追加・移動</label>
     </div>
     <div class="tl-bar"><div class="tl-progress"></div></div>
     <div class="phase-banner">
-      <div class="ph-text ph-1"><strong>Phase 1 (初期):</strong> テーブル全体が1つのスプリット（<code>Split 1</code>）に収まり、<code>Node 1</code> だけで処理しています（ノード数: 1台構成相当）。</div>
-      <div class="ph-text ph-2"><strong>Phase 2 (境界設定):</strong> <code>[400, 600)</code> への集中アクセスで <code>Node 1</code> が高負荷になり、内部にスプリット境界線が自動で引かれます。</div>
-      <div class="ph-text ph-3"><strong>Phase 3 (スプリット移動):</strong> 分割された <code>1b</code> が <code>Node 2</code> へ移動し、キー空間の担当色（紫）とCPU負荷が2台に分かれます。</div>
-      <div class="ph-text ph-4"><strong>Phase 4 (ノード追加):</strong> 新たに <code>Node 3</code> が追加され、<code>1c</code> が移動（緑）することで、3台すべてに均等分散されます。</div>
+      <div class="ph-text ph-1"><strong>Phase 1 (初期状態):</strong> 境界のない1つの <code>Split 1</code> に全キーがあり、<code>Node 1</code> だけで処理しています。</div>
+      <div class="ph-text ph-2"><strong>Phase 2 (境界設定・分割):</strong> <code>[400, 600)</code> への集中で <code>Node 1</code> が高負荷になり、境界が入って4つのスプリットに割れます。</div>
+      <div class="ph-text ph-3"><strong>Phase 3 (スプリット移動):</strong> 割れた <code>1b</code> が真下の <code>Node 2</code> レーンへ移動し、負荷が2台に分かれます。</div>
+      <div class="ph-text ph-4"><strong>Phase 4 (ノード追加・再分散):</strong> 新たに <code>Node 3</code> が追加され、<code>1c</code> が <code>Node 3</code> へ移動して3台へ均等分散されます。</div>
     </div>
   </div>
 
-  <!-- 上段: 論理テーブルのキー空間（色は担当ノードと一致） -->
-  <div class="section-box">
-    <div class="section-head">
-      <span class="section-title">テーブルの論理キー空間（色は担当ノードと対応）</span>
-      <span class="state-layer">
-        <span class="st-item ph-1 badge-n1">1つの大きな Split 1（すべて Node 1）</span>
-        <span class="st-item ph-2 badge-hot">高負荷検知 → 境界（400, 500, 600）を追加</span>
-        <span class="st-item ph-3 badge-n2">Split 1b を Node 2（紫）へ割り当て</span>
-        <span class="st-item ph-4 badge-n3">Split 1c を追加された Node 3（緑）へ</span>
-      </span>
+  <!-- 2次元マトリクス: 横軸=キー空間 / 縦軸=ノード行（スプリットが同じ列のまま縦の別ノードへ移動） -->
+  <div class="matrix-wrap">
+    <div class="matrix-head">
+      <div class="mh-node">ノード / CPU負荷</div>
+      <div class="mh-keys">
+        <span><code>[1, 400)</code></span>
+        <span><code>[400, 500)</code></span>
+        <span><code>[500, 600)</code></span>
+        <span><code>[600, 1000)</code></span>
+      </div>
     </div>
 
-    <div class="keyspace-wrap">
-      <div class="ks-single state-layer">
-        <div class="st-item ph-1 ks-unified">
-          <span class="ks-title">Split 1: <code>Key [1, 1000)</code></span>
-          <span class="ks-sub">境界なし（全データを1スプリットで保持 → Node 1 担当）</span>
+    <div class="lanes">
+      <!-- Node 1 行 -->
+      <div class="lane-row lane-1">
+        <div class="lane-info">
+          <div class="li-top">
+            <span class="li-name">Node 1</span>
+            <span class="state-layer">
+              <span class="st-item ph-1 badge-n1">25%</span>
+              <span class="st-item ph-2 badge-hot">95% Hot</span>
+              <span class="st-item ph-3 badge-warn">58%</span>
+              <span class="st-item ph-4 badge-ok">32%</span>
+            </span>
+          </div>
+          <div class="cpu-bar"><div class="cpu-fill fill-n1"></div></div>
         </div>
-      </div>
 
-      <div class="ks-split-grid">
-        <div class="ks-cell ks-1a">
-          <div class="ks-rng"><code>[1, 400)</code></div>
-          <div class="ks-tag">1a (Node 1)</div>
-        </div>
-        <div class="ks-cell ks-1b">
-          <div class="ks-rng"><code>[400, 500)</code></div>
-          <div class="ks-tag state-layer">
-            <span class="st-item ph-2">1b (高負荷)</span>
-            <span class="st-item ph-3">1b (Node 2)</span>
-            <span class="st-item ph-4">1b (Node 2)</span>
+        <div class="lane-track">
+          <!-- Phase 1 のシームレスな単一 Split 1 表示 -->
+          <div class="unified-bar">Split 1: <code>[1, 1000)</code>（境界なし・単一スプリット）</div>
+
+          <!-- 分割された4つのスプリット（1b と 1c が物理的に下のノード行へ移動） -->
+          <div class="split-slots">
+            <div class="sp-block sp-1a">
+              <span class="sp-id">1a</span>
+              <span class="sp-sub"><code>[1,400)</code></span>
+            </div>
+            <div class="sp-block sp-1b">
+              <span class="sp-id">1b</span>
+              <span class="sp-sub state-layer">
+                <span class="st-item ph-2">高負荷</span>
+                <span class="st-item ph-3">Node 2へ</span>
+                <span class="st-item ph-4">Node 2</span>
+              </span>
+            </div>
+            <div class="sp-block sp-1c">
+              <span class="sp-id">1c</span>
+              <span class="sp-sub state-layer">
+                <span class="st-item ph-2">高負荷</span>
+                <span class="st-item ph-3">残存</span>
+                <span class="st-item ph-4">Node 3へ</span>
+              </span>
+            </div>
+            <div class="sp-block sp-1d">
+              <span class="sp-id">1d</span>
+              <span class="sp-sub"><code>[600,1000)</code></span>
+            </div>
           </div>
         </div>
-        <div class="ks-cell ks-1c">
-          <div class="ks-rng"><code>[500, 600)</code></div>
-          <div class="ks-tag state-layer">
-            <span class="st-item ph-2">1c (高負荷)</span>
-            <span class="st-item ph-3">1c (Node 1)</span>
-            <span class="st-item ph-4">1c (Node 3)</span>
+      </div>
+
+      <!-- Node 2 行 -->
+      <div class="lane-row lane-2">
+        <div class="lane-info">
+          <div class="li-top">
+            <span class="li-name">Node 2</span>
+            <span class="state-layer">
+              <span class="st-item ph-1 badge-muted">10%</span>
+              <span class="st-item ph-2 badge-muted">10%</span>
+              <span class="st-item ph-3 badge-n2">52%</span>
+              <span class="st-item ph-4 badge-ok">34%</span>
+            </span>
           </div>
+          <div class="cpu-bar"><div class="cpu-fill fill-n2"></div></div>
         </div>
-        <div class="ks-cell ks-1d">
-          <div class="ks-rng"><code>[600, 1000)</code></div>
-          <div class="ks-tag">1d (Node 1)</div>
+        <div class="lane-track track-drop">
+          <div class="drop-slot"></div>
+          <div class="drop-slot slot-1b">
+            <span class="state-layer">
+              <span class="st-item ph-1 hint-txt">待機中</span>
+              <span class="st-item ph-2 hint-txt">待機中</span>
+            </span>
+          </div>
+          <div class="drop-slot"></div>
+          <div class="drop-slot"></div>
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- 下段: ノードと格納スプリット（Node 3 は Phase 4 で初めて出現） -->
-  <div class="nodes-stage">
-    <div class="node-card node-1">
-      <div class="node-head">
-        <span class="node-title"><span class="dot dot-n1"></span>Node 1</span>
-        <span class="state-layer">
-          <span class="st-item ph-1 badge-n1">CPU 25%</span>
-          <span class="st-item ph-2 badge-hot">CPU 95% (Hot)</span>
-          <span class="st-item ph-3 badge-warn">CPU 58%</span>
-          <span class="st-item ph-4 badge-ok">CPU 32%</span>
-        </span>
-      </div>
-      <div class="cpu-bar"><div class="cpu-fill fill-n1"></div></div>
-      <div class="slot-area">
-        <div class="sp-chip chip-n1 chip-1a">
-          <span class="st-item ph-1">Split 1 <code>[1, 1000)</code></span>
-          <span class="st-item ph-2">1a <code>[1, 400)</code></span>
-          <span class="st-item ph-3">1a <code>[1, 400)</code></span>
-          <span class="st-item ph-4">1a <code>[1, 400)</code></span>
+      <!-- Node 3 行（Phase 4 で初めて出現） -->
+      <div class="lane-row lane-3">
+        <div class="lane-info">
+          <div class="li-top">
+            <span class="li-name">Node 3 (追加)</span>
+            <span class="badge-ok">34%</span>
+          </div>
+          <div class="cpu-bar"><div class="cpu-fill fill-n3"></div></div>
         </div>
-        <div class="sp-chip chip-n1 chip-1b-n1">1b <code>[400, 500)</code></div>
-        <div class="sp-chip chip-n1 chip-1c-n1">1c <code>[500, 600)</code></div>
-        <div class="sp-chip chip-n1 chip-1d">1d <code>[600, 1000)</code></div>
-      </div>
-    </div>
-
-    <div class="node-card node-2">
-      <div class="node-head">
-        <span class="node-title"><span class="dot dot-n2"></span>Node 2</span>
-        <span class="state-layer">
-          <span class="st-item ph-1 badge-muted">CPU 10%</span>
-          <span class="st-item ph-2 badge-muted">CPU 10%</span>
-          <span class="st-item ph-3 badge-n2">CPU 52%</span>
-          <span class="st-item ph-4 badge-n2">CPU 34%</span>
-        </span>
-      </div>
-      <div class="cpu-bar"><div class="cpu-fill fill-n2"></div></div>
-      <div class="slot-area">
-        <div class="empty-msg state-layer">
-          <span class="st-item ph-1">担当スプリットなし</span>
-          <span class="st-item ph-2">受け入れ待機中</span>
+        <div class="lane-track track-drop">
+          <div class="drop-slot"></div>
+          <div class="drop-slot"></div>
+          <div class="drop-slot slot-1c"></div>
+          <div class="drop-slot"></div>
         </div>
-        <div class="sp-chip chip-n2 chip-1b-n2">移動完了: 1b <code>[400, 500)</code></div>
-      </div>
-    </div>
-
-    <div class="node-card node-3">
-      <div class="node-head">
-        <span class="node-title"><span class="dot dot-n3"></span>Node 3 (追加)</span>
-        <span class="badge-n3">CPU 34%</span>
-      </div>
-      <div class="cpu-bar"><div class="cpu-fill fill-n3"></div></div>
-      <div class="slot-area">
-        <div class="sp-chip chip-n3 chip-1c-n3">移動完了: 1c <code>[500, 600)</code></div>
       </div>
     </div>
   </div>
@@ -351,7 +352,10 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
     --n3: #15803d; --n3-bg: #dcfce7;
     --amber: #b45309; --amber-bg: #fef3c7;
     --red: #b91c1c; --red-bg: #fee2e2;
-    --cycle: 14s;
+    --cycle: 20s;
+    --row-h: 64px;
+    --row-gap: 8px;
+    --step-y: 72px;
     box-sizing: border-box; padding: 12px; background: var(--bg); color: var(--text);
     border: 1px solid var(--border); border-radius: 10px;
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
@@ -406,225 +410,213 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
   #sim-p3:checked ~ * .ph-3,
   #sim-p4:checked ~ * .ph-4 { opacity: 1; animation: none !important; }
 
-  .section-box {
+  /* マトリクス本体 */
+  .matrix-wrap {
     background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-    padding: 8px 10px; margin-bottom: 8px;
+    padding: 8px 10px;
   }
-  .section-head {
-    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
-    gap: 6px; margin-bottom: 6px;
+  .matrix-head {
+    display: grid; grid-template-columns: 145px 1fr; gap: 8px;
+    padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid var(--border);
+    font-size: 12px; font-weight: 700; color: var(--text-muted);
   }
-  .section-title { font-weight: 700; font-size: 12px; }
-  .badge-n1, .badge-n2, .badge-n3, .badge-hot, .badge-warn, .badge-ok, .badge-muted {
-    display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 12px; font-weight: 700; text-align: right;
-  }
-  .badge-n1 { background: var(--n1-bg); color: var(--n1); }
-  .badge-n2 { background: var(--n2-bg); color: var(--n2); }
-  .badge-n3, .badge-ok { background: var(--n3-bg); color: var(--n3); }
-  .badge-hot { background: var(--red-bg); color: var(--red); }
-  .badge-warn { background: var(--amber-bg); color: var(--amber); }
-  .badge-muted { background: var(--surface-sub); color: var(--text-muted); }
+  .mh-keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center; }
 
-  /* 上段: 論理キー空間 */
-  .keyspace-wrap { position: relative; display: grid; }
-  .ks-single { grid-area: 1 / 1; z-index: 2; pointer-events: none; }
-  .ks-unified {
-    background: var(--n1-bg); border: 2px solid var(--n1); border-radius: 6px;
-    padding: 8px; text-align: center; display: flex; flex-direction: column; justify-content: center;
+  .lanes { display: flex; flex-direction: column; gap: var(--row-gap); }
+  .lane-row {
+    display: grid; grid-template-columns: 145px 1fr; gap: 8px; align-items: center;
+    height: var(--row-h); padding: 6px 8px; border-radius: 8px;
+    background: var(--surface-sub); border: 1.5px solid var(--border);
+    position: relative;
   }
-  .ks-title { font-weight: 700; font-size: 13px; color: var(--n1); }
-  .ks-sub { font-size: 12px; color: var(--text-muted); }
-
-  .ks-split-grid {
-    grid-area: 1 / 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
-  }
-  .ks-cell {
-    border-radius: 6px; padding: 6px 4px; text-align: center;
-    background: var(--n1-bg); border: 1.5px solid var(--n1);
-  }
-  .ks-rng { font-weight: 700; font-size: 12px; }
-  .ks-tag { font-size: 12px; font-weight: 600; color: var(--n1); }
-
-  #sim-auto:checked ~ .section-box .ks-split-grid { animation: ks-grid-vis var(--cycle) infinite; }
-  #sim-auto:checked ~ .section-box .ks-1b { animation: ks-1b-col var(--cycle) infinite; }
-  #sim-auto:checked ~ .section-box .ks-1c { animation: ks-1c-col var(--cycle) infinite; }
-
-  #sim-p1:checked ~ .section-box .ks-split-grid { opacity: 0; }
-  #sim-p2:checked ~ .section-box .ks-1b,
-  #sim-p2:checked ~ .section-box .ks-1c { background: var(--red-bg); border: 1.5px dashed var(--red); color: var(--red); }
-  #sim-p2:checked ~ .section-box .ks-1b .ks-tag,
-  #sim-p2:checked ~ .section-box .ks-1c .ks-tag { color: var(--red); }
-  #sim-p3:checked ~ .section-box .ks-1b { background: var(--n2-bg); border: 1.5px solid var(--n2); }
-  #sim-p3:checked ~ .section-box .ks-1b .ks-tag { color: var(--n2); }
-  #sim-p3:checked ~ .section-box .ks-1c { background: var(--amber-bg); border: 1.5px dashed var(--amber); }
-  #sim-p3:checked ~ .section-box .ks-1c .ks-tag { color: var(--amber); }
-  #sim-p4:checked ~ .section-box .ks-1b { background: var(--n2-bg); border: 1.5px solid var(--n2); }
-  #sim-p4:checked ~ .section-box .ks-1b .ks-tag { color: var(--n2); }
-  #sim-p4:checked ~ .section-box .ks-1c { background: var(--n3-bg); border: 1.5px solid var(--n3); }
-  #sim-p4:checked ~ .section-box .ks-1c .ks-tag { color: var(--n3); }
-
-  /* 下段: ノードコンテナ群（Node 3 は後から動的に展開・追加） */
-  .nodes-stage { display: flex; gap: 8px; align-items: stretch; }
-  .node-card {
-    flex: 1 1 0; min-width: 0;
-    background: var(--surface); border: 1.5px solid var(--border); border-radius: 8px;
-    padding: 8px; display: flex; flex-direction: column; gap: 5px;
-  }
-  .node-1 { border-color: var(--n1); }
-  .node-2 { border-color: var(--border); }
-  .node-3 {
-    flex: 0 0 0; opacity: 0; padding: 0; border-width: 0; margin: 0; overflow: hidden;
+  .lane-1 { z-index: 3; border-color: var(--n1); }
+  .lane-2 { z-index: 2; }
+  .lane-3 {
+    z-index: 1; height: 0; opacity: 0; padding-top: 0; padding-bottom: 0;
+    border-width: 0; margin-top: calc(-1 * var(--row-gap)); overflow: hidden;
     border-color: var(--n3);
   }
 
-  .node-head { display: flex; justify-content: space-between; align-items: center; gap: 4px; flex-wrap: wrap; }
-  .node-title { display: flex; align-items: center; gap: 5px; font-weight: 700; font-size: 12px; white-space: nowrap; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-  .dot-n1 { background: var(--n1); }
-  .dot-n2 { background: var(--n2); }
-  .dot-n3 { background: var(--n3); }
-
-  .cpu-bar { width: 100%; height: 7px; background: var(--surface-sub); border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
-  .cpu-fill { height: 100%; border-radius: 3px; width: 25%; transition: width 0.35s ease, background 0.35s ease; }
-  .fill-n1 { background: var(--n1); }
+  .lane-info { display: flex; flex-direction: column; gap: 5px; }
+  .li-top { display: flex; justify-content: space-between; align-items: center; gap: 4px; }
+  .li-name { font-weight: 700; font-size: 12px; white-space: nowrap; }
+  .cpu-bar { width: 100%; height: 7px; background: var(--surface); border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
+  .cpu-fill { height: 100%; border-radius: 3px; width: 25%; background: var(--n1); transition: width 0.5s ease, background 0.5s ease; }
   .fill-n2 { width: 10%; background: var(--text-muted); }
   .fill-n3 { width: 34%; background: var(--n3); }
 
-  .slot-area { display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start; min-height: 48px; }
-  .sp-chip {
-    padding: 3px 6px; border-radius: 4px; font-size: 12px; font-weight: 600;
-    display: inline-grid; align-items: center; white-space: nowrap;
+  .badge-n1, .badge-n2, .badge-hot, .badge-warn, .badge-ok, .badge-muted {
+    display: inline-block; padding: 1px 5px; border-radius: 4px; font-size: 12px; font-weight: 700; text-align: right; white-space: nowrap;
   }
-  .sp-chip .st-item { grid-area: 1 / 1; }
-  .chip-n1 { background: var(--n1-bg); color: var(--n1); border: 1px solid var(--n1); }
-  .chip-n2 { background: var(--n2-bg); color: var(--n2); border: 1px solid var(--n2); }
-  .chip-n3 { background: var(--n3-bg); color: var(--n3); border: 1px solid var(--n3); }
-  .empty-msg { font-size: 12px; color: var(--text-muted); padding: 4px 0; }
+  .badge-n1 { background: var(--n1-bg); color: var(--n1); }
+  .badge-n2 { background: var(--n2-bg); color: var(--n2); }
+  .badge-ok { background: var(--n3-bg); color: var(--n3); }
+  .badge-hot { background: var(--red-bg); color: var(--red); }
+  .badge-warn { background: var(--amber-bg); color: var(--amber); }
+  .badge-muted { background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); }
 
-  /* スプリットチップの出現・移動アニメーション */
-  #sim-auto:checked ~ .nodes-stage .chip-1b-n1 { animation: chip-1b-n1 var(--cycle) infinite; }
-  #sim-auto:checked ~ .nodes-stage .chip-1c-n1 { animation: chip-1c-n1 var(--cycle) infinite; }
-  #sim-auto:checked ~ .nodes-stage .chip-1d    { animation: chip-1d-vis var(--cycle) infinite; }
-  #sim-auto:checked ~ .nodes-stage .chip-1b-n2 { animation: chip-1b-n2 var(--cycle) infinite; }
-  #sim-auto:checked ~ .nodes-stage .node-1     { animation: n1-box var(--cycle) infinite; }
-  #sim-auto:checked ~ .nodes-stage .node-2     { animation: n2-box var(--cycle) infinite; }
-  #sim-auto:checked ~ .nodes-stage .node-3     { animation: n3-add var(--cycle) infinite; }
-  #sim-auto:checked ~ .nodes-stage .fill-n1    { animation: cpu-n1 var(--cycle) infinite; }
-  #sim-auto:checked ~ .nodes-stage .fill-n2    { animation: cpu-n2 var(--cycle) infinite; }
+  .lane-track { position: relative; height: 48px; display: grid; }
+  .unified-bar {
+    grid-area: 1 / 1; z-index: 3;
+    background: var(--n1-bg); border: 2px solid var(--n1); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 12px; color: var(--n1);
+  }
+  .split-slots, .track-drop {
+    grid-area: 1 / 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; height: 100%;
+  }
+  .sp-block {
+    border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: var(--n1-bg); border: 1.5px solid var(--n1); color: var(--n1);
+    font-weight: 700; position: relative; z-index: 5;
+    transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1), background 0.4s ease, border-color 0.4s ease, color 0.4s ease;
+  }
+  .sp-id { font-size: 12px; font-weight: 700; line-height: 1.1; }
+  .sp-sub { font-size: 12px; font-weight: 600; line-height: 1.1; }
 
-  /* 手動タブ固定時 */
-  #sim-p1:checked ~ .nodes-stage .chip-1b-n1,
-  #sim-p1:checked ~ .nodes-stage .chip-1c-n1,
-  #sim-p1:checked ~ .nodes-stage .chip-1d,
-  #sim-p1:checked ~ .nodes-stage .chip-1b-n2 { display: none; }
-  #sim-p2:checked ~ .nodes-stage .chip-1b-n1,
-  #sim-p2:checked ~ .nodes-stage .chip-1c-n1 { background: var(--red-bg); color: var(--red); border: 1px dashed var(--red); }
-  #sim-p2:checked ~ .nodes-stage .chip-1b-n2 { display: none; }
-  #sim-p3:checked ~ .nodes-stage .chip-1b-n1 { display: none; }
-  #sim-p3:checked ~ .nodes-stage .chip-1c-n1 { background: var(--amber-bg); color: var(--amber); border: 1px dashed var(--amber); }
-  #sim-p4:checked ~ .nodes-stage .chip-1b-n1,
-  #sim-p4:checked ~ .nodes-stage .chip-1c-n1 { display: none; }
+  .drop-slot {
+    border-radius: 6px; border: 1px dashed var(--border); background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .hint-txt { font-size: 12px; color: var(--text-muted); }
 
-  #sim-p1:checked ~ .nodes-stage .fill-n1 { width: 25%; background: var(--n1); }
-  #sim-p2:checked ~ .nodes-stage .fill-n1 { width: 95%; background: var(--red); }
-  #sim-p3:checked ~ .nodes-stage .fill-n1 { width: 58%; background: var(--amber); }
-  #sim-p4:checked ~ .nodes-stage .fill-n1 { width: 32%; background: var(--n3); }
-  #sim-p3:checked ~ .nodes-stage .fill-n2 { width: 52%; background: var(--n2); }
-  #sim-p4:checked ~ .nodes-stage .fill-n2 { width: 34%; background: var(--n2); }
-  #sim-p3:checked ~ .nodes-stage .node-2 { border-color: var(--n2); }
-  #sim-p4:checked ~ .nodes-stage .node-2 { border-color: var(--n2); }
-  #sim-p4:checked ~ .nodes-stage .node-3 {
-    flex: 1 1 0; opacity: 1; padding: 8px; border-width: 1.5px;
+  /* 自動再生アニメーション (20秒サイクル: P1 0-20%, P2 20-45%, P3 45-72%, P4 72-100%) */
+  #sim-auto:checked ~ .matrix-wrap .unified-bar { animation: unibar-vis var(--cycle) infinite; }
+  #sim-auto:checked ~ .matrix-wrap .split-slots { animation: slots-vis var(--cycle) infinite; }
+  #sim-auto:checked ~ .matrix-wrap .sp-1b { animation: move-1b var(--cycle) infinite; }
+  #sim-auto:checked ~ .matrix-wrap .sp-1c { animation: move-1c var(--cycle) infinite; }
+  #sim-auto:checked ~ .matrix-wrap .lane-1 { animation: l1-box var(--cycle) infinite; }
+  #sim-auto:checked ~ .matrix-wrap .lane-2 { animation: l2-box var(--cycle) infinite; }
+  #sim-auto:checked ~ .matrix-wrap .lane-3 { animation: l3-add var(--cycle) infinite; }
+  #sim-auto:checked ~ .matrix-wrap .fill-n1 { animation: cpu-n1 var(--cycle) infinite; }
+  #sim-auto:checked ~ .matrix-wrap .fill-n2 { animation: cpu-n2 var(--cycle) infinite; }
+
+  /* 手動フェーズ固定 */
+  #sim-p1:checked ~ .matrix-wrap .split-slots { opacity: 0; }
+  #sim-p2:checked ~ .matrix-wrap .unified-bar,
+  #sim-p3:checked ~ .matrix-wrap .unified-bar,
+  #sim-p4:checked ~ .matrix-wrap .unified-bar { opacity: 0; pointer-events: none; }
+
+  #sim-p2:checked ~ .matrix-wrap .sp-1b,
+  #sim-p2:checked ~ .matrix-wrap .sp-1c { background: var(--red-bg); border: 1.5px dashed var(--red); color: var(--red); }
+  #sim-p2:checked ~ .matrix-wrap .fill-n1 { width: 95%; background: var(--red); }
+  #sim-p2:checked ~ .matrix-wrap .lane-1 { border-color: var(--red); }
+
+  #sim-p3:checked ~ .matrix-wrap .sp-1b {
+    transform: translateY(var(--step-y));
+    background: var(--n2-bg); border-color: var(--n2); color: var(--n2);
+  }
+  #sim-p3:checked ~ .matrix-wrap .sp-1c { background: var(--amber-bg); border: 1.5px dashed var(--amber); color: var(--amber); }
+  #sim-p3:checked ~ .matrix-wrap .fill-n1 { width: 58%; background: var(--amber); }
+  #sim-p3:checked ~ .matrix-wrap .fill-n2 { width: 52%; background: var(--n2); }
+  #sim-p3:checked ~ .matrix-wrap .lane-1 { border-color: var(--amber); }
+  #sim-p3:checked ~ .matrix-wrap .lane-2 { border-color: var(--n2); }
+
+  #sim-p4:checked ~ .matrix-wrap .sp-1b {
+    transform: translateY(var(--step-y));
+    background: var(--n2-bg); border-color: var(--n2); color: var(--n2);
+  }
+  #sim-p4:checked ~ .matrix-wrap .sp-1c {
+    transform: translateY(calc(2 * var(--step-y)));
+    background: var(--n3-bg); border-color: var(--n3); color: var(--n3);
+  }
+  #sim-p4:checked ~ .matrix-wrap .fill-n1 { width: 32%; background: var(--n3); }
+  #sim-p4:checked ~ .matrix-wrap .fill-n2 { width: 34%; background: var(--n2); }
+  #sim-p4:checked ~ .matrix-wrap .lane-1 { border-color: var(--n3); }
+  #sim-p4:checked ~ .matrix-wrap .lane-2 { border-color: var(--n2); }
+  #sim-p4:checked ~ .matrix-wrap .lane-3 {
+    height: var(--row-h); opacity: 1; padding: 6px 8px; border-width: 1.5px; margin-top: 0;
   }
 
   @keyframes tl-run {
     0% { width: 0%; background: var(--n1); }
-    24% { width: 25%; background: var(--n1); }
-    25% { width: 25%; background: var(--red); }
-    49% { width: 50%; background: var(--red); }
-    50% { width: 50%; background: var(--n2); }
-    74% { width: 75%; background: var(--n2); }
-    75% { width: 75%; background: var(--n3); }
+    19% { width: 25%; background: var(--n1); }
+    20% { width: 25%; background: var(--red); }
+    44% { width: 50%; background: var(--red); }
+    45% { width: 50%; background: var(--n2); }
+    71% { width: 75%; background: var(--n2); }
+    72% { width: 75%; background: var(--n3); }
     100% { width: 100%; background: var(--n3); }
   }
-  @keyframes vis-p1 { 0%, 22% { opacity: 1; } 25%, 100% { opacity: 0; } }
-  @keyframes vis-p2 { 0%, 23% { opacity: 0; } 25%, 47% { opacity: 1; } 50%, 100% { opacity: 0; } }
-  @keyframes vis-p3 { 0%, 48% { opacity: 0; } 50%, 72% { opacity: 1; } 75%, 100% { opacity: 0; } }
-  @keyframes vis-p4 { 0%, 73% { opacity: 0; } 75%, 97% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes vis-p1 { 0%, 18% { opacity: 1; } 20%, 100% { opacity: 0; } }
+  @keyframes vis-p2 { 0%, 19% { opacity: 0; } 20%, 43% { opacity: 1; } 45%, 100% { opacity: 0; } }
+  @keyframes vis-p3 { 0%, 44% { opacity: 0; } 45%, 70% { opacity: 1; } 72%, 100% { opacity: 0; } }
+  @keyframes vis-p4 { 0%, 71% { opacity: 0; } 72%, 97% { opacity: 1; } 100% { opacity: 0; } }
 
-  @keyframes ks-grid-vis { 0%, 22% { opacity: 0; } 25%, 97% { opacity: 1; } 100% { opacity: 0; } }
-  @keyframes ks-1b-col {
-    0%, 47% { background: var(--red-bg); border: 1.5px dashed var(--red); color: var(--red); }
-    50%, 97% { background: var(--n2-bg); border: 1.5px solid var(--n2); color: var(--n2); }
-    100% { background: var(--red-bg); border: 1.5px dashed var(--red); color: var(--red); }
-  }
-  @keyframes ks-1c-col {
-    0%, 47% { background: var(--red-bg); border: 1.5px dashed var(--red); color: var(--red); }
-    50%, 72% { background: var(--amber-bg); border: 1.5px dashed var(--amber); color: var(--amber); }
-    75%, 97% { background: var(--n3-bg); border: 1.5px solid var(--n3); color: var(--n3); }
-    100% { background: var(--red-bg); border: 1.5px dashed var(--red); color: var(--red); }
-  }
-  @keyframes chip-1d-vis { 0%, 22% { display: none; opacity: 0; } 25%, 97% { display: inline-grid; opacity: 1; } 100% { display: none; } }
-  @keyframes chip-1b-n1 {
-    0%, 22% { display: none; opacity: 0; }
-    25%, 47% { display: inline-grid; opacity: 1; background: var(--red-bg); color: var(--red); border: 1px dashed var(--red); }
-    50%, 100% { display: none; opacity: 0; }
-  }
-  @keyframes chip-1c-n1 {
-    0%, 22% { display: none; opacity: 0; }
-    25%, 47% { display: inline-grid; opacity: 1; background: var(--red-bg); color: var(--red); border: 1px dashed var(--red); }
-    50%, 72% { display: inline-grid; opacity: 1; background: var(--amber-bg); color: var(--amber); border: 1px dashed var(--amber); }
-    75%, 100% { display: none; opacity: 0; }
-  }
-  @keyframes chip-1b-n2 { 0%, 47% { display: none; opacity: 0; } 50%, 97% { display: inline-grid; opacity: 1; } 100% { display: none; } }
+  @keyframes unibar-vis { 0%, 18% { opacity: 1; } 20%, 97% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes slots-vis { 0%, 18% { opacity: 0; gap: 0px; } 20%, 97% { opacity: 1; gap: 6px; } 100% { opacity: 0; } }
 
-  @keyframes n1-box {
-    0%, 22% { border-color: var(--n1); }
-    25%, 47% { border-color: var(--red); }
-    50%, 72% { border-color: var(--amber); }
-    75%, 97% { border-color: var(--n3); }
+  @keyframes move-1b {
+    0%, 18% { transform: translateY(0); background: var(--n1-bg); border-color: var(--n1); color: var(--n1); }
+    20%, 44% { transform: translateY(0); background: var(--red-bg); border: 1.5px dashed var(--red); color: var(--red); }
+    52%, 97% { transform: translateY(var(--step-y)); background: var(--n2-bg); border: 1.5px solid var(--n2); color: var(--n2); }
+    100% { transform: translateY(0); background: var(--n1-bg); border-color: var(--n1); color: var(--n1); }
+  }
+  @keyframes move-1c {
+    0%, 18% { transform: translateY(0); background: var(--n1-bg); border-color: var(--n1); color: var(--n1); }
+    20%, 44% { transform: translateY(0); background: var(--red-bg); border: 1.5px dashed var(--red); color: var(--red); }
+    46%, 73% { transform: translateY(0); background: var(--amber-bg); border: 1.5px dashed var(--amber); color: var(--amber); }
+    81%, 97% { transform: translateY(calc(2 * var(--step-y))); background: var(--n3-bg); border: 1.5px solid var(--n3); color: var(--n3); }
+    100% { transform: translateY(0); background: var(--n1-bg); border-color: var(--n1); color: var(--n1); }
+  }
+  @keyframes l1-box {
+    0%, 18% { border-color: var(--n1); }
+    20%, 44% { border-color: var(--red); }
+    46%, 71% { border-color: var(--amber); }
+    73%, 97% { border-color: var(--n3); }
     100% { border-color: var(--n1); }
   }
-  @keyframes n2-box { 0%, 47% { border-color: var(--border); } 50%, 97% { border-color: var(--n2); } 100% { border-color: var(--border); } }
-  @keyframes n3-add {
-    0%, 72% { flex: 0 0 0; opacity: 0; padding: 0; border-width: 0; }
-    75%, 97% { flex: 1 1 0; opacity: 1; padding: 8px; border-width: 1.5px; }
-    100% { flex: 0 0 0; opacity: 0; padding: 0; border-width: 0; }
+  @keyframes l2-box {
+    0%, 46% { border-color: var(--border); }
+    50%, 97% { border-color: var(--n2); }
+    100% { border-color: var(--border); }
+  }
+  @keyframes l3-add {
+    0%, 71% { height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-width: 0; margin-top: calc(-1 * var(--row-gap)); }
+    76%, 97% { height: var(--row-h); opacity: 1; padding-top: 6px; padding-bottom: 6px; border-width: 1.5px; margin-top: 0; }
+    100% { height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-width: 0; margin-top: calc(-1 * var(--row-gap)); }
   }
   @keyframes cpu-n1 {
-    0%, 22% { width: 25%; background: var(--n1); }
-    25%, 47% { width: 95%; background: var(--red); }
-    50%, 72% { width: 58%; background: var(--amber); }
-    75%, 97% { width: 32%; background: var(--n3); }
+    0%, 18% { width: 25%; background: var(--n1); }
+    20%, 44% { width: 95%; background: var(--red); }
+    48%, 73% { width: 58%; background: var(--amber); }
+    78%, 97% { width: 32%; background: var(--n3); }
     100% { width: 25%; background: var(--n1); }
   }
   @keyframes cpu-n2 {
-    0%, 47% { width: 10%; background: var(--text-muted); }
-    50%, 72% { width: 52%; background: var(--n2); }
-    75%, 97% { width: 34%; background: var(--n2); }
+    0%, 46% { width: 10%; background: var(--text-muted); }
+    52%, 73% { width: 52%; background: var(--n2); }
+    78%, 97% { width: 34%; background: var(--n2); }
     100% { width: 10%; background: var(--text-muted); }
   }
 
   @media (max-width: 640px) {
-    .diagram { padding: 8px; }
-    .sim-toolbar, .section-box { padding: 6px 8px; margin-bottom: 6px; }
-    .ks-split-grid { grid-template-columns: 1fr 1fr; gap: 4px; }
-    .nodes-stage { flex-direction: column; gap: 5px; }
-    .node-card { flex: none; padding: 6px 8px; gap: 4px; }
-    .slot-area { min-height: 0; }
-    .node-3 { max-height: 0; }
-    #sim-p4:checked ~ .nodes-stage .node-3 { flex: none; max-height: 140px; padding: 6px 8px; }
-    #sim-auto:checked ~ .nodes-stage .node-3 { animation: n3-add-mob var(--cycle) infinite; }
-  }
-  @keyframes n3-add-mob {
-    0%, 72% { max-height: 0; opacity: 0; padding: 0; border-width: 0; }
-    75%, 97% { max-height: 140px; opacity: 1; padding: 6px 8px; border-width: 1.5px; }
-    100% { max-height: 0; opacity: 0; padding: 0; border-width: 0; }
+    .diagram {
+      padding: 8px;
+      --row-h: 82px;
+      --row-gap: 6px;
+      --step-y: 88px;
+    }
+    .sim-toolbar, .matrix-wrap { padding: 6px 8px; }
+    .matrix-head { grid-template-columns: 1fr; gap: 3px; }
+    .mh-node { display: none; }
+    .mh-keys { gap: 3px; font-size: 12px; }
+    .lane-row { grid-template-columns: 1fr; gap: 4px; padding: 5px 6px; }
+    .lane-info { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }
+    .li-top { gap: 6px; }
+    .cpu-bar { width: 70px; flex-shrink: 0; }
+    .lane-track { height: 44px; }
+    .split-slots, .track-drop { gap: 3px; }
+    .sp-sub { display: none; }
   }
   @media (prefers-reduced-motion: reduce) {
     .diagram *, .diagram *::before, .diagram *::after { animation: none !important; transition: none !important; }
     #sim-auto:checked ~ * .ph-4 { opacity: 1; }
-    #sim-auto:checked ~ .nodes-stage .node-3 { flex: 1 1 0; max-height: 140px; opacity: 1; padding: 8px; border-width: 1.5px; }
+    #sim-auto:checked ~ .matrix-wrap .unified-bar { opacity: 0; }
+    #sim-auto:checked ~ .matrix-wrap .split-slots { opacity: 1; }
+    #sim-auto:checked ~ .matrix-wrap .lane-3 { height: var(--row-h); opacity: 1; padding: 6px 8px; border-width: 1.5px; margin-top: 0; }
+    #sim-auto:checked ~ .matrix-wrap .sp-1b { transform: translateY(var(--step-y)); background: var(--n2-bg); border-color: var(--n2); color: var(--n2); }
+    #sim-auto:checked ~ .matrix-wrap .sp-1c { transform: translateY(calc(2 * var(--step-y))); background: var(--n3-bg); border-color: var(--n3); color: var(--n3); }
   }
 </style>
 ```
