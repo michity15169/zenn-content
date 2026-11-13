@@ -1753,50 +1753,73 @@ CREATE TABLE Albums (
 
 ```html-embed
 <div class="diagram">
-  <div class="storage-grid">
-    <div class="split-box">
+  <div class="il-layout">
+    <!-- Split 1 (Node 1): 複数の Singers とその Albums が同居 -->
+    <div class="split-box box-n1">
       <div class="split-head">
-        <span class="split-label">Split 1 (Server A)</span>
-        <span class="split-range">Key Range (SingerId): <code>[1, 5000)</code></span>
+        <span class="split-label lbl-n1">Split 1 (Node 1)</span>
+        <span class="split-range"><code>SingerId: [1, 5000)</code></span>
       </div>
-      <div class="parent-row">
-        <div class="row-line">
-          <span class="row-tag tag-parent">親: Singers</span>
-          <span class="row-data">SingerId = <code>1024</code> ("Alice")</span>
-        </div>
-        <div class="child-group">
-          <div class="child-row">
-            <span class="row-tag tag-child">子: Albums</span>
-            <span>SingerId = <code>1024</code>, AlbumId = <code>1</code></span>
+      <div class="parent-list">
+        <div class="parent-row">
+          <div class="row-line">
+            <span class="row-tag tag-parent">親: Singers</span>
+            <span class="row-data"><code>1024</code> ("Alice")</span>
           </div>
-          <div class="child-row">
-            <span class="row-tag tag-child">子: Albums</span>
-            <span>SingerId = <code>1024</code>, AlbumId = <code>2</code></span>
+          <div class="child-group">
+            <div class="child-row"><span class="row-tag tag-child">子: Albums</span><code>1024, 1</code> / <code>1024, 2</code></div>
           </div>
         </div>
+
+        <div class="parent-row">
+          <div class="row-line">
+            <span class="row-tag tag-parent">親: Singers</span>
+            <span class="row-data"><code>2500</code> ("Carol")</span>
+          </div>
+          <div class="child-group">
+            <div class="child-row"><span class="row-tag tag-child">子: Albums</span><code>2500, 1</code></div>
+          </div>
+        </div>
+
+        <div class="more-rows">... 複数の Singers と子行が同居 ...</div>
       </div>
     </div>
 
-    <div class="split-divider">
-      <span>スプリット境界（原則として親テーブルの行の間で分割される）</span>
+    <!-- スプリット境界 -->
+    <div class="split-sep">
+      <div class="sep-line"></div>
+      <div class="sep-badge">スプリット境界<br><code>SingerId = 5000</code><br>（親行の間で分割）</div>
+      <div class="sep-line"></div>
     </div>
 
-    <div class="split-box">
+    <!-- Split 2 (Node 2): 複数の Singers とその Albums が同居 -->
+    <div class="split-box box-n2">
       <div class="split-head">
-        <span class="split-label">Split 2 (Server B)</span>
-        <span class="split-range">Key Range (SingerId): <code>[5000, ∞)</code></span>
+        <span class="split-label lbl-n2">Split 2 (Node 2)</span>
+        <span class="split-range"><code>SingerId: [5000, ∞)</code></span>
       </div>
-      <div class="parent-row">
-        <div class="row-line">
-          <span class="row-tag tag-parent">親: Singers</span>
-          <span class="row-data">SingerId = <code>6400</code> ("Bob")</span>
-        </div>
-        <div class="child-group">
-          <div class="child-row">
-            <span class="row-tag tag-child">子: Albums</span>
-            <span>SingerId = <code>6400</code>, AlbumId = <code>1</code></span>
+      <div class="parent-list">
+        <div class="parent-row">
+          <div class="row-line">
+            <span class="row-tag tag-parent">親: Singers</span>
+            <span class="row-data"><code>6400</code> ("Bob")</span>
+          </div>
+          <div class="child-group">
+            <div class="child-row"><span class="row-tag tag-child">子: Albums</span><code>6400, 1</code> / <code>6400, 2</code></div>
           </div>
         </div>
+
+        <div class="parent-row">
+          <div class="row-line">
+            <span class="row-tag tag-parent">親: Singers</span>
+            <span class="row-data"><code>8200</code> ("Dave")</span>
+          </div>
+          <div class="child-group">
+            <div class="child-row"><span class="row-tag tag-child">子: Albums</span><code>8200, 1</code></div>
+          </div>
+        </div>
+
+        <div class="more-rows">... 複数の Singers と子行が同居 ...</div>
       </div>
     </div>
   </div>
@@ -1806,56 +1829,73 @@ CREATE TABLE Albums (
   .diagram {
     --bg: #f8fafc; --surface: #ffffff; --surface-sub: #f1f5f9;
     --text: #0f172a; --text-muted: #475569; --border: #cbd5e1;
-    --primary: #0284c7; --primary-bg: #e0f2fe;
-    --green: #15803d; --green-bg: #dcfce7; --amber: #b45309;
+    --n1: #0284c7; --n1-bg: #e0f2fe;
+    --n2: #7c3aed; --n2-bg: #ede9fe;
+    --green: #15803d; --green-bg: #dcfce7;
+    --amber: #b45309; --amber-bg: #fef3c7;
     box-sizing: border-box; padding: 12px; background: var(--bg); color: var(--text);
     border: 1px solid var(--border); border-radius: 10px;
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
-    font-size: 12px; line-height: 1.4;
+    font-size: 12px; line-height: 1.35;
   }
   [data-theme="dark"] .diagram {
     --bg: #0f172a; --surface: #1e293b; --surface-sub: #162032;
     --text: #f1f5f9; --text-muted: #94a3b8; --border: #334155;
-    --primary: #38bdf8; --primary-bg: #0c4a6e;
-    --green: #4ade80; --green-bg: #064e3b; --amber: #fbbf24;
+    --n1: #38bdf8; --n1-bg: #0c4a6e;
+    --n2: #a78bfa; --n2-bg: #3b0764;
+    --green: #4ade80; --green-bg: #064e3b;
+    --amber: #fbbf24; --amber-bg: #451a03;
   }
   .diagram *, .diagram *::before, .diagram *::after { box-sizing: border-box; }
-  .storage-grid { display: flex; flex-direction: column; gap: 8px; }
-  .split-box {
-    background: var(--surface); border: 1.5px solid var(--primary); border-radius: 8px; padding: 8px 10px;
-  }
+
+  .il-layout { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: stretch; }
+  .split-box { background: var(--surface); border: 1.5px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+  .box-n1 { border-color: var(--n1); }
+  .box-n2 { border-color: var(--n2); }
   .split-head {
-    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;
     padding-bottom: 5px; margin-bottom: 6px; border-bottom: 1px solid var(--border); font-size: 12px;
   }
-  .split-label { font-weight: 700; color: var(--primary); }
-  .split-range { color: var(--text-muted); }
+  .split-label { font-weight: 700; }
+  .lbl-n1 { color: var(--n1); }
+  .lbl-n2 { color: var(--n2); }
+  .split-range { color: var(--text-muted); font-size: 12px; }
+
+  .parent-list { display: flex; flex-direction: column; gap: 5px; }
   .parent-row {
-    background: var(--surface-sub); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px;
+    background: var(--surface-sub); border: 1px solid var(--border); border-radius: 6px; padding: 5px 7px;
   }
-  .row-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .row-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
   .row-data { font-size: 12px; font-weight: 600; }
-  .child-group { display: flex; flex-direction: column; gap: 4px; padding-left: 10px; border-left: 2px solid var(--green); }
+  .child-group { display: flex; flex-direction: column; gap: 3px; padding-left: 8px; border-left: 2px solid var(--green); }
   .child-row {
     background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
-    padding: 4px 8px; font-size: 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+    padding: 3px 6px; font-size: 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
   }
-  .row-tag {
-    display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 12px; font-weight: 700;
-  }
-  .tag-parent { background: var(--primary-bg); color: var(--primary); }
+  .row-tag { display: inline-block; padding: 1px 5px; border-radius: 4px; font-size: 12px; font-weight: 700; }
+  .tag-parent { background: var(--n1-bg); color: var(--n1); }
+  .box-n2 .tag-parent { background: var(--n2-bg); color: var(--n2); }
   .tag-child { background: var(--green-bg); color: var(--green); }
-  .split-divider {
-    display: flex; align-items: center; gap: 8px; color: var(--amber); font-size: 12px; font-weight: 600;
+  .more-rows { text-align: center; font-size: 12px; color: var(--text-muted); padding: 2px 0; }
+
+  .split-sep { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+  .sep-line { flex: 1; width: 0; border-left: 2px dashed var(--amber); }
+  .sep-badge {
+    background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber);
+    border-radius: 6px; padding: 4px 6px; text-align: center; font-size: 12px; font-weight: 700; line-height: 1.25;
   }
-  .split-divider::before, .split-divider::after {
-    content: ""; flex: 1; border-top: 1.5px dashed var(--amber);
-  }
+
   @media (max-width: 640px) {
     .diagram { padding: 8px; }
+    .il-layout { grid-template-columns: 1fr; gap: 6px; }
     .split-box { padding: 6px 8px; }
-    .parent-row { padding: 5px 6px; }
-    .child-row { padding: 3px 6px; gap: 4px; }
+    .parent-list { gap: 4px; }
+    .parent-row { padding: 4px 6px; }
+    .split-sep { flex-direction: row; gap: 6px; }
+    .sep-line { width: auto; height: 0; border-left: none; border-top: 1.5px dashed var(--amber); }
+    .sep-badge br { display: none; }
+    .sep-badge { padding: 2px 6px; }
+    .more-rows { display: none; }
   }
 </style>
 ```
