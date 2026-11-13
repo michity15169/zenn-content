@@ -748,7 +748,433 @@ MySQLやPostgreSQLなどの一般的なRDBでは、原則として1台のプラ�
 
 このようにSpannerはトラフィックの変化に合わせて自律的にスプリットを再構成しますが、負荷の検知から分割・移動が完了するまでには数分程度の時間がかかります[^1][^3]。緩やかにトラフィックが増える通常の運用では問題になりませんが、「空の新規テーブルに対して最初から大量のデータを一括投入する場面」や「大規模なキャンペーン開始で秒間アクセス数が一気に跳ね上がる場面」では、自動分割が追いつく前に最初の1スプリット（1台のサーバー）が飽和し、レイテンシ悪化やタイムアウトを招くことがあります[^3]。
 
-そうした予測可能な急激な負荷増加に対しては、あらかじめキー空間にスプリット境界を作成しておく「事前分割（Pre-splitting / Split Points）」という機能も用意されています[^3]。
+そうした予測可能な急激な負荷増加に対しては、あらかじめキー空間にスプリット境界（Split points）を作成しておく「事前分割（Pre-splitting）」という機能が用意されています[^3]。実際にトラフィックが急増する前に事前分割とノードの追加を済ませておくと、以下の流れで高負荷を迎え撃つことができます。
+
+```html-embed
+<div class="diagram">
+  <input type="radio" name="ps-sim" id="ps-auto" class="ps-radio" checked>
+  <input type="radio" name="ps-sim" id="ps-p1" class="ps-radio">
+  <input type="radio" name="ps-sim" id="ps-p2" class="ps-radio">
+  <input type="radio" name="ps-sim" id="ps-p3" class="ps-radio">
+  <input type="radio" name="ps-sim" id="ps-p4" class="ps-radio">
+  <input type="radio" name="ps-sim" id="ps-p5" class="ps-radio">
+
+  <div class="ps-toolbar">
+    <div class="ps-tabs">
+      <label for="ps-auto" class="ps-tab pst-auto">自動再生 (25秒)</label>
+      <label for="ps-p1" class="ps-tab pst-p1">1. 初期 (1ノード)</label>
+      <label for="ps-p2" class="ps-tab pst-p2">2. 分割点指定</label>
+      <label for="ps-p3" class="ps-tab pst-p3">3. 事前分割</label>
+      <label for="ps-p4" class="ps-tab pst-p4">4. ノード追加・分散</label>
+      <label for="ps-p5" class="ps-tab pst-p5">5. 負荷到来</label>
+    </div>
+    <div class="ps-tl"><div class="ps-tl-bar"></div></div>
+    <div class="ps-banner">
+      <div class="ps-ph psp-1"><strong>Step 1 (初期状態):</strong> 高負荷が来る前の段階では、<code>Node 1</code> 上の1つのスプリット（<code>[1, 1000)</code>）にデータが格納されています。</div>
+      <div class="ps-ph psp-2"><strong>Step 2 (事前準備・分割点指定):</strong> 大量アクセスの開始前（推奨12時間〜7日前）に、pre-splitting で分割点（<code>333</code>, <code>666</code>）を指定します。</div>
+      <div class="ps-ph psp-3"><strong>Step 3 (スプリット分割):</strong> 負荷が来る前に、指定した分割点に沿ってスプリットが3つへ事前に分割されます。</div>
+      <div class="ps-ph psp-4"><strong>Step 4 (ノード追加・徐々に分散):</strong> <code>Node 2</code>・<code>Node 3</code> を追加すると、分割済みのスプリットが追加ノードへ順次分散配置されます。</div>
+      <div class="ps-ph psp-5"><strong>Step 5 (負荷到来・受け止め完了):</strong> 大量リクエストが一気に到来しても、すでに全ノードへ分散されているため CPU 45% 程度で安定して処理できます。</div>
+    </div>
+  </div>
+
+  <div class="ps-matrix">
+    <div class="ps-mhead">
+      <div class="ps-mh-node">ノード / CPU使用率</div>
+      <div class="ps-mh-keys">
+        <span><code>[1, 333)</code></span>
+        <span><code>[333, 666)</code></span>
+        <span><code>[666, 1000)</code></span>
+      </div>
+    </div>
+
+    <div class="ps-lanes">
+      <!-- Node 1 行 -->
+      <div class="ps-row ps-lane-1">
+        <div class="ps-info">
+          <div class="ps-itop">
+            <span class="ps-iname">Node 1</span>
+            <span class="ps-state">
+              <span class="ps-st psp-1 ps-b-idle">CPU 15%</span>
+              <span class="ps-st psp-2 ps-b-prep">CPU 15%</span>
+              <span class="ps-st psp-3 ps-b-n1">CPU 15%</span>
+              <span class="ps-st psp-4 ps-b-n1">CPU 15%</span>
+              <span class="ps-st psp-5 ps-b-ok">CPU 45%</span>
+            </span>
+          </div>
+          <div class="ps-meter"><div class="ps-fill ps-f1"></div></div>
+        </div>
+
+        <div class="ps-track">
+          <!-- Step 1〜2: 単一スプリット（Step 2 で分割点マーカー表示） -->
+          <div class="ps-unified">
+            <div class="ps-u-seg">
+              <span class="ps-state">
+                <span class="ps-st psp-1"></span>
+                <span class="ps-st psp-2 ps-pt-txt"><code>[1, 333)</code></span>
+              </span>
+            </div>
+            <div class="ps-u-mid">
+              <span class="ps-state">
+                <span class="ps-st psp-1">Split 1: <code>[1, 1000)</code>（単一スプリット）</span>
+                <span class="ps-st psp-2 ps-pt-txt">分割点指定: <code>333</code> | <code>666</code></span>
+              </span>
+            </div>
+            <div class="ps-u-seg">
+              <span class="ps-state">
+                <span class="ps-st psp-1"></span>
+                <span class="ps-st psp-2 ps-pt-txt"><code>[666, 1000)</code></span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Step 3〜5: 3つに事前分割されたスプリット（Step 4 で Node 2, 3 へ順次移動） -->
+          <div class="ps-split3">
+            <div class="ps-blk ps-b1">
+              <span class="ps-bid"><code>[1, 333)</code></span>
+              <span class="ps-state">
+                <span class="ps-st psp-3 ps-bsub">分割完了</span>
+                <span class="ps-st psp-4 ps-bsub">Node 1</span>
+                <span class="ps-st psp-5 ps-bsub-ok">負荷受信(安定)</span>
+              </span>
+            </div>
+            <div class="ps-blk ps-b2">
+              <span class="ps-bid"><code>[333, 666)</code></span>
+              <span class="ps-state">
+                <span class="ps-st psp-3 ps-bsub">分割完了</span>
+                <span class="ps-st psp-4 ps-bsub">Node 2へ分散</span>
+                <span class="ps-st psp-5 ps-bsub-ok">負荷受信(安定)</span>
+              </span>
+            </div>
+            <div class="ps-blk ps-b3">
+              <span class="ps-bid"><code>[666, 1000)</code></span>
+              <span class="ps-state">
+                <span class="ps-st psp-3 ps-bsub">分割完了</span>
+                <span class="ps-st psp-4 ps-bsub">Node 3へ分散</span>
+                <span class="ps-st psp-5 ps-bsub-ok">負荷受信(安定)</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Node 2 行（Step 4 で追加） -->
+      <div class="ps-row ps-lane-2">
+        <div class="ps-info">
+          <div class="ps-itop">
+            <span class="ps-iname">Node 2 (追加)</span>
+            <span class="ps-state">
+              <span class="ps-st psp-4 ps-b-n2">CPU 15%</span>
+              <span class="ps-st psp-5 ps-b-ok">CPU 45%</span>
+            </span>
+          </div>
+          <div class="ps-meter"><div class="ps-fill ps-f2"></div></div>
+        </div>
+        <div class="ps-track ps-drop-track">
+          <div class="ps-spacer"></div>
+          <div class="ps-drop"></div>
+          <div class="ps-spacer"></div>
+        </div>
+      </div>
+
+      <!-- Node 3 行（Step 4 で追加） -->
+      <div class="ps-row ps-lane-3">
+        <div class="ps-info">
+          <div class="ps-itop">
+            <span class="ps-iname">Node 3 (追加)</span>
+            <span class="ps-state">
+              <span class="ps-st psp-4 ps-b-n3">CPU 15%</span>
+              <span class="ps-st psp-5 ps-b-ok">CPU 45%</span>
+            </span>
+          </div>
+          <div class="ps-meter"><div class="ps-fill ps-f3"></div></div>
+        </div>
+        <div class="ps-track ps-drop-track">
+          <div class="ps-spacer"></div>
+          <div class="ps-spacer"></div>
+          <div class="ps-drop"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .diagram {
+    --bg: #f8fafc; --surface: #ffffff; --surface-sub: #f1f5f9;
+    --text: #0f172a; --text-muted: #475569; --border: #cbd5e1;
+    --meter-bg: #e2e8f0;
+    --n1: #0284c7; --n1-bg: #e0f2fe;
+    --n2: #7c3aed; --n2-bg: #ede9fe;
+    --n3: #15803d; --n3-bg: #dcfce7;
+    --amber: #b45309; --amber-bg: #fef3c7;
+    --pscycle: 25s;
+    --ps-rh: 58px;
+    --ps-gap: 7px;
+    --ps-sy: 65px;
+    box-sizing: border-box; padding: 12px; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    font-size: 12px; line-height: 1.35;
+  }
+  [data-theme="dark"] .diagram {
+    --bg: #0f172a; --surface: #1e293b; --surface-sub: #162032;
+    --text: #f1f5f9; --text-muted: #94a3b8; --border: #334155;
+    --meter-bg: #0f172a;
+    --n1: #38bdf8; --n1-bg: #0c4a6e;
+    --n2: #a78bfa; --n2-bg: #3b0764;
+    --n3: #4ade80; --n3-bg: #064e3b;
+    --amber: #fbbf24; --amber-bg: #451a03;
+  }
+  .diagram *, .diagram *::before, .diagram *::after { box-sizing: border-box; }
+  .ps-radio { display: none; }
+
+  .ps-toolbar {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; margin-bottom: 8px;
+  }
+  .ps-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+  .ps-tab {
+    padding: 2px 7px; border-radius: 4px; font-size: 12px; font-weight: 600;
+    background: var(--surface-sub); color: var(--text-muted); border: 1px solid var(--border);
+    cursor: pointer; user-select: none;
+  }
+  #ps-auto:checked ~ .ps-toolbar .pst-auto,
+  #ps-p1:checked ~ .ps-toolbar .pst-p1,
+  #ps-p2:checked ~ .ps-toolbar .pst-p2,
+  #ps-p3:checked ~ .ps-toolbar .pst-p3,
+  #ps-p4:checked ~ .ps-toolbar .pst-p4,
+  #ps-p5:checked ~ .ps-toolbar .pst-p5 {
+    background: var(--n1-bg); color: var(--n1); border-color: var(--n1); font-weight: 700;
+  }
+  .ps-tl { width: 100%; height: 4px; background: var(--surface-sub); border-radius: 2px; overflow: hidden; margin-bottom: 6px; }
+  .ps-tl-bar { height: 100%; background: var(--n1); width: 100%; }
+  #ps-auto:checked ~ .ps-toolbar .ps-tl-bar { animation: pstl var(--pscycle) infinite linear; }
+  #ps-p1:checked ~ .ps-toolbar .ps-tl-bar { width: 20%; }
+  #ps-p2:checked ~ .ps-toolbar .ps-tl-bar { width: 40%; background: var(--amber); }
+  #ps-p3:checked ~ .ps-toolbar .ps-tl-bar { width: 60%; background: var(--n1); }
+  #ps-p4:checked ~ .ps-toolbar .ps-tl-bar { width: 80%; background: var(--n2); }
+  #ps-p5:checked ~ .ps-toolbar .ps-tl-bar { width: 100%; background: var(--n3); }
+
+  .ps-banner, .ps-state { display: grid; }
+  .ps-ph, .ps-st { grid-area: 1 / 1; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; text-align: center; }
+  .ps-ph { text-align: left; }
+
+  #ps-auto:checked ~ * .psp-1 { animation: psvis-1 var(--pscycle) infinite; }
+  #ps-auto:checked ~ * .psp-2 { animation: psvis-2 var(--pscycle) infinite; }
+  #ps-auto:checked ~ * .psp-3 { animation: psvis-3 var(--pscycle) infinite; }
+  #ps-auto:checked ~ * .psp-4 { animation: psvis-4 var(--pscycle) infinite; }
+  #ps-auto:checked ~ * .psp-5 { animation: psvis-5 var(--pscycle) infinite; }
+  #ps-p1:checked ~ * .psp-1,
+  #ps-p2:checked ~ * .psp-2,
+  #ps-p3:checked ~ * .psp-3,
+  #ps-p4:checked ~ * .psp-4,
+  #ps-p5:checked ~ * .psp-5 { opacity: 1; animation: none !important; }
+
+  .ps-matrix { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+  .ps-mhead {
+    display: grid; grid-template-columns: 155px 1fr; gap: 8px;
+    padding-bottom: 5px; margin-bottom: 6px; border-bottom: 1px solid var(--border);
+    font-size: 12px; font-weight: 700; color: var(--text-muted);
+  }
+  .ps-mh-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; }
+  .ps-lanes { display: flex; flex-direction: column; gap: var(--ps-gap); }
+  .ps-row {
+    display: grid; grid-template-columns: 155px 1fr; gap: 8px; align-items: center;
+    height: var(--ps-rh); padding: 5px 8px; border-radius: 8px;
+    background: var(--surface-sub); border: 1.5px solid var(--border); position: relative;
+  }
+  .ps-lane-1 { z-index: 3; border-color: var(--n1); }
+  .ps-lane-2, .ps-lane-3 {
+    z-index: 2; height: 0; opacity: 0; padding-top: 0; padding-bottom: 0;
+    border-width: 0; margin-top: calc(-1 * var(--ps-gap)); overflow: hidden;
+  }
+  .ps-lane-2 { border-color: var(--n2); }
+  .ps-lane-3 { z-index: 1; border-color: var(--n3); }
+
+  .ps-info { display: flex; flex-direction: column; gap: 4px; }
+  .ps-itop { display: flex; justify-content: space-between; align-items: center; gap: 4px; }
+  .ps-iname { font-weight: 700; font-size: 12px; white-space: nowrap; }
+  .ps-meter { width: 100%; height: 9px; background: var(--meter-bg); border-radius: 5px; overflow: hidden; border: 1px solid var(--border); }
+  .ps-fill { height: 100%; border-radius: 4px; width: 15%; background: var(--n1); transition: width 0.4s ease, background 0.4s ease; }
+
+  .ps-b-idle, .ps-b-prep, .ps-b-n1, .ps-b-n2, .ps-b-n3, .ps-b-ok {
+    display: inline-block; padding: 1px 5px; border-radius: 4px; font-size: 12px; font-weight: 700; white-space: nowrap;
+  }
+  .ps-b-idle { background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); }
+  .ps-b-prep { background: var(--amber-bg); color: var(--amber); }
+  .ps-b-n1 { background: var(--n1-bg); color: var(--n1); }
+  .ps-b-n2 { background: var(--n2-bg); color: var(--n2); }
+  .ps-b-n3, .ps-b-ok { background: var(--n3-bg); color: var(--n3); }
+
+  .ps-track { position: relative; height: 42px; display: grid; }
+  .ps-unified {
+    grid-area: 1 / 1; z-index: 3;
+    background: var(--n1-bg); border: 2px solid var(--n1); border-radius: 6px;
+    display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: stretch; overflow: hidden;
+    font-weight: 700; font-size: 12px; color: var(--n1);
+  }
+  .ps-u-seg, .ps-u-mid { display: grid; align-items: center; text-align: center; padding: 0 3px; }
+  .ps-pt-txt { color: var(--amber); font-weight: 700; }
+
+  .ps-split3 { grid-area: 1 / 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; height: 100%; }
+  .ps-drop-track { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; height: 42px; }
+  .ps-spacer { background: transparent; border: none; }
+  .ps-drop { border-radius: 6px; border: 1px dashed var(--border); background: var(--surface); }
+
+  .ps-blk {
+    border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: var(--n1-bg); border: 1.5px solid var(--n1); color: var(--n1);
+    font-weight: 700; position: relative; z-index: 5; text-align: center;
+  }
+  .ps-bid { font-size: 12px; line-height: 1.1; }
+  .ps-bsub, .ps-bsub-ok { font-size: 12px; font-weight: 600; line-height: 1.1; }
+
+  /* 自動再生 (25秒サイクル: P1 0-18%, P2 20-38%, P3 40-58%, P4 60-78%, P5 80-98%) */
+  #ps-auto:checked ~ .ps-matrix .ps-unified { animation: ps-unibar var(--pscycle) infinite; }
+  #ps-auto:checked ~ .ps-matrix .ps-u-mid   { animation: ps-umid var(--pscycle) infinite; }
+  #ps-auto:checked ~ .ps-matrix .ps-split3  { animation: ps-splits var(--pscycle) infinite; }
+  #ps-auto:checked ~ .ps-matrix .ps-b1      { animation: ps-blk-1 var(--pscycle) infinite; }
+  #ps-auto:checked ~ .ps-matrix .ps-b2      { animation: ps-blk-2 var(--pscycle) infinite; }
+  #ps-auto:checked ~ .ps-matrix .ps-b3      { animation: ps-blk-3 var(--pscycle) infinite; }
+  #ps-auto:checked ~ .ps-matrix .ps-lane-1  { animation: ps-l1 var(--pscycle) infinite; }
+  #ps-auto:checked ~ .ps-matrix .ps-lane-2  { animation: ps-add-2 var(--pscycle) infinite; }
+  #ps-auto:checked ~ .ps-matrix .ps-lane-3  { animation: ps-add-3 var(--pscycle) infinite; }
+  #ps-auto:checked ~ .ps-matrix .ps-f1      { animation: ps-cpu-all var(--pscycle) infinite; }
+  #ps-auto:checked ~ .ps-matrix .ps-f2      { animation: ps-cpu-23 var(--pscycle) infinite; }
+  #ps-auto:checked ~ .ps-matrix .ps-f3      { animation: ps-cpu-23 var(--pscycle) infinite; }
+
+  /* 手動固定 */
+  #ps-p1:checked ~ .ps-matrix .ps-split3,
+  #ps-p2:checked ~ .ps-matrix .ps-split3 { opacity: 0; pointer-events: none; }
+  #ps-p2:checked ~ .ps-matrix .ps-unified { border-color: var(--amber); background: var(--amber-bg); }
+  #ps-p2:checked ~ .ps-matrix .ps-u-mid { border-left: 2px dashed var(--amber); border-right: 2px dashed var(--amber); }
+  #ps-p2:checked ~ .ps-matrix .ps-lane-1 { border-color: var(--amber); }
+
+  #ps-p3:checked ~ .ps-matrix .ps-unified,
+  #ps-p4:checked ~ .ps-matrix .ps-unified,
+  #ps-p5:checked ~ .ps-matrix .ps-unified { opacity: 0; pointer-events: none; }
+
+  #ps-p4:checked ~ .ps-matrix .ps-lane-2,
+  #ps-p4:checked ~ .ps-matrix .ps-lane-3,
+  #ps-p5:checked ~ .ps-matrix .ps-lane-2,
+  #ps-p5:checked ~ .ps-matrix .ps-lane-3 { height: var(--ps-rh); opacity: 1; padding: 5px 8px; border-width: 1.5px; margin-top: 0; }
+
+  #ps-p4:checked ~ .ps-matrix .ps-b2,
+  #ps-p5:checked ~ .ps-matrix .ps-b2 { transform: translateY(var(--ps-sy)); background: var(--n2-bg); border-color: var(--n2); color: var(--n2); }
+  #ps-p4:checked ~ .ps-matrix .ps-b3,
+  #ps-p5:checked ~ .ps-matrix .ps-b3 { transform: translateY(calc(2 * var(--ps-sy))); background: var(--n3-bg); border-color: var(--n3); color: var(--n3); }
+
+  #ps-p4:checked ~ .ps-matrix .ps-f2 { width: 15%; background: var(--n2); }
+  #ps-p4:checked ~ .ps-matrix .ps-f3 { width: 15%; background: var(--n3); }
+
+  #ps-p5:checked ~ .ps-matrix .ps-f1,
+  #ps-p5:checked ~ .ps-matrix .ps-f2,
+  #ps-p5:checked ~ .ps-matrix .ps-f3 { width: 45%; background: var(--n3); }
+  #ps-p5:checked ~ .ps-matrix .ps-b1,
+  #ps-p5:checked ~ .ps-matrix .ps-b2,
+  #ps-p5:checked ~ .ps-matrix .ps-b3 { background: var(--n3-bg); border-color: var(--n3); color: var(--n3); }
+  #ps-p5:checked ~ .ps-matrix .ps-lane-1,
+  #ps-p5:checked ~ .ps-matrix .ps-lane-2,
+  #ps-p5:checked ~ .ps-matrix .ps-lane-3 { border-color: var(--n3); }
+
+  @keyframes pstl {
+    0% { width: 0%; background: var(--n1); } 19% { width: 20%; background: var(--n1); }
+    20% { width: 20%; background: var(--amber); } 39% { width: 40%; background: var(--amber); }
+    40% { width: 40%; background: var(--n1); } 59% { width: 60%; background: var(--n1); }
+    60% { width: 60%; background: var(--n2); } 79% { width: 80%; background: var(--n2); }
+    80% { width: 80%; background: var(--n3); } 100% { width: 100%; background: var(--n3); }
+  }
+  @keyframes psvis-1 { 0%, 18% { opacity: 1; } 20%, 100% { opacity: 0; } }
+  @keyframes psvis-2 { 0%, 19% { opacity: 0; } 20%, 38% { opacity: 1; } 40%, 100% { opacity: 0; } }
+  @keyframes psvis-3 { 0%, 39% { opacity: 0; } 40%, 58% { opacity: 1; } 60%, 100% { opacity: 0; } }
+  @keyframes psvis-4 { 0%, 59% { opacity: 0; } 60%, 78% { opacity: 1; } 80%, 100% { opacity: 0; } }
+  @keyframes psvis-5 { 0%, 79% { opacity: 0; } 80%, 98% { opacity: 1; } 100% { opacity: 0; } }
+
+  @keyframes ps-unibar {
+    0%, 18% { opacity: 1; background: var(--n1-bg); border-color: var(--n1); }
+    20%, 38% { opacity: 1; background: var(--amber-bg); border-color: var(--amber); }
+    40%, 98% { opacity: 0; } 100% { opacity: 1; background: var(--n1-bg); border-color: var(--n1); }
+  }
+  @keyframes ps-umid {
+    0%, 18% { border-color: transparent; }
+    20%, 38% { border-left: 2px dashed var(--amber); border-right: 2px dashed var(--amber); }
+    40%, 100% { border-color: transparent; }
+  }
+  @keyframes ps-splits { 0%, 38% { opacity: 0; gap: 0px; } 42%, 98% { opacity: 1; gap: 6px; } 100% { opacity: 0; } }
+  @keyframes ps-blk-1 {
+    0%, 78% { background: var(--n1-bg); border-color: var(--n1); color: var(--n1); }
+    82%, 98% { background: var(--n3-bg); border-color: var(--n3); color: var(--n3); }
+    100% { background: var(--n1-bg); border-color: var(--n1); color: var(--n1); }
+  }
+  @keyframes ps-blk-2 {
+    0%, 59% { transform: translateY(0); background: var(--n1-bg); border-color: var(--n1); color: var(--n1); }
+    65%, 78% { transform: translateY(var(--ps-sy)); background: var(--n2-bg); border-color: var(--n2); color: var(--n2); }
+    82%, 98% { transform: translateY(var(--ps-sy)); background: var(--n3-bg); border-color: var(--n3); color: var(--n3); }
+    100% { transform: translateY(0); }
+  }
+  @keyframes ps-blk-3 {
+    0%, 66% { transform: translateY(0); background: var(--n1-bg); border-color: var(--n1); color: var(--n1); }
+    74%, 98% { transform: translateY(calc(2 * var(--ps-sy))); background: var(--n3-bg); border-color: var(--n3); color: var(--n3); }
+    100% { transform: translateY(0); }
+  }
+  @keyframes ps-l1 {
+    0%, 18% { border-color: var(--n1); } 20%, 38% { border-color: var(--amber); }
+    40%, 78% { border-color: var(--n1); } 82%, 98% { border-color: var(--n3); } 100% { border-color: var(--n1); }
+  }
+  @keyframes ps-add-2 {
+    0%, 58% { height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-width: 0; margin-top: calc(-1 * var(--ps-gap)); }
+    62%, 98% { height: var(--ps-rh); opacity: 1; padding-top: 5px; padding-bottom: 5px; border-width: 1.5px; margin-top: 0; border-color: var(--n2); }
+    100% { height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-width: 0; margin-top: calc(-1 * var(--ps-gap)); }
+  }
+  @keyframes ps-add-3 {
+    0%, 63% { height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-width: 0; margin-top: calc(-1 * var(--ps-gap)); }
+    67%, 98% { height: var(--ps-rh); opacity: 1; padding-top: 5px; padding-bottom: 5px; border-width: 1.5px; margin-top: 0; border-color: var(--n3); }
+    100% { height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-width: 0; margin-top: calc(-1 * var(--ps-gap)); }
+  }
+  @keyframes ps-cpu-all {
+    0%, 78% { width: 15%; background: var(--n1); }
+    84%, 98% { width: 45%; background: var(--n3); }
+    100% { width: 15%; background: var(--n1); }
+  }
+  @keyframes ps-cpu-23 {
+    0%, 78% { width: 15%; background: var(--n2); }
+    84%, 98% { width: 45%; background: var(--n3); }
+    100% { width: 15%; background: var(--n2); }
+  }
+
+  @media (max-width: 640px) {
+    .diagram { padding: 8px; --ps-rh: 74px; --ps-gap: 5px; --ps-sy: 79px; }
+    .ps-toolbar, .ps-matrix { padding: 6px 8px; }
+    .ps-mhead { grid-template-columns: 1fr; gap: 3px; }
+    .ps-mh-node { display: none; }
+    .ps-mh-keys { gap: 3px; font-size: 12px; }
+    .ps-row { grid-template-columns: 1fr; gap: 4px; padding: 4px 6px; }
+    .ps-info { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }
+    .ps-meter { width: 76px; flex-shrink: 0; }
+    .ps-track, .ps-drop-track { height: 38px; }
+    .ps-u-seg { display: none; }
+    .ps-unified { grid-template-columns: 1fr; }
+    .ps-split3, .ps-drop-track { gap: 3px; }
+    .ps-bsub, .ps-bsub-ok { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .diagram *, .diagram *::before, .diagram *::after { animation: none !important; transition: none !important; }
+    #ps-auto:checked ~ * .psp-5 { opacity: 1; }
+    #ps-auto:checked ~ .ps-matrix .ps-unified { opacity: 0; }
+    #ps-auto:checked ~ .ps-matrix .ps-split3 { opacity: 1; }
+    #ps-auto:checked ~ .ps-matrix .ps-lane-2,
+    #ps-auto:checked ~ .ps-matrix .ps-lane-3 { height: var(--ps-rh); opacity: 1; padding: 5px 8px; border-width: 1.5px; margin-top: 0; }
+    #ps-auto:checked ~ .ps-matrix .ps-b2 { transform: translateY(var(--ps-sy)); background: var(--n3-bg); border-color: var(--n3); color: var(--n3); }
+    #ps-auto:checked ~ .ps-matrix .ps-b3 { transform: translateY(calc(2 * var(--ps-sy))); background: var(--n3-bg); border-color: var(--n3); color: var(--n3); }
+    #ps-auto:checked ~ .ps-matrix .ps-f1,
+    #ps-auto:checked ~ .ps-matrix .ps-f2,
+    #ps-auto:checked ~ .ps-matrix .ps-f3 { width: 45%; background: var(--n3); }
+  }
+</style>
+```
+
+まずStep 1では1つのスプリットに全データが収まっており、Step 2の事前準備としてトラフィック増加の12時間〜7日前を目安にSplit points（分割点）を指定します[^3]。するとStep 3でトラフィック到来前にスプリットが事前分割され、Step 4でノードを追加するにつれて分割されたスプリットが追加ノードへ徐々に分散配置されます。これにより、Step 5で一気に高い負荷が来ても最初から複数のノードへ分散した状態で受け止めることができます[^3]。なお、公式ガイドでは目安として1ノードあたり10個のSplit pointsを作成することが推奨されています[^3]。
 
 ## なぜプライマリキーに連番やタイムスタンプを使うとスケールしないのか
 
