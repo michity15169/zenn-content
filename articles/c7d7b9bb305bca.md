@@ -4,7 +4,8 @@ emoji: "🗄️"
 type: "tech" # tech: 技術記事 / idea: アイデア
 topics: ["spanner", "googlecloud", "database"]
 publication_name: "google_cloud_jp"
-published: false
+published: true
+published_at: "2026-11-26 08:00"
 ---
 
 ## tl;dr
